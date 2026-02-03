@@ -74,14 +74,7 @@ Generate 6-column qualitative result figures, including Frequency and Semantic A
 python test.py
 ```
 > **Results:** Output images are saved in `[SAVE_DIR]/[RATIO]/results/[CATEGORY]/`. These figures highlight how the **Proposed Baseline** captures high-frequency structures and semantic context.
-
-### 4. Comparison (Semantic Gap Analysis)
-Perform a gap analysis between the proposed model (Semantic ON) and the reference model (Semantic OFF).
-```bash
-# To perform gap analysis and export results
-python evaluation_gap.py
-```
-> **Output:** A comprehensive CSV file (`result_gap_via_sem_onoff.csv`) will be generated, documenting the performance improvements.
+) will be generated, documenting the performance improvements.
 
 ---
 
@@ -108,7 +101,7 @@ WEDGE-Net/
 
 ## 🛠️ Installation
 ```bash
-git clone https://github.com/aura1999jmpark/WEDGE-Net.git
+git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
 cd WEDGE-Net
 pip install -r requirements.txt
 
