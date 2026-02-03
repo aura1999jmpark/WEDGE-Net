@@ -87,7 +87,6 @@ python test.py
 ) will be generated, documenting the performance improvements.
 
 ---
----
 
 ## 🛡️ Robustness Experiments (Quantitative Analysis)
 We provide evaluation scripts to reproduce the robustness experiments (Figure 6) demonstrated in the paper. These scripts measure AUROC scores under varying environmental distortions and automatically generate result graphs (`.png`) and data tables (`.csv`).
@@ -98,6 +97,15 @@ Evaluates the model's stability against image noise ($\sigma = 0 \sim 40$).
 ```bash
 python eval_noise_robustness.py
 ```
+> **Output:** full_noise_comparison_smoothed_{CATEGORY}_{RATIO}.csv: AUROC scores for each noise level. figure_noise_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.
+
+### 2. Color Jitter Robustness
+Evaluates the model's stability against domain shifts (Brightness, Contrast, Saturation, Hue).
+```bash
+python eval_color_robustness.py
+```
+> **Output:** final_color_comparison_{CATEGORY}_{RATIO}.csv: AUROC scores for each intensity factor ($0.0 \sim 3.0$). figure6_color_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph (matches Figure 6 in the paper).
+> **Note:** Comparison with Baseline: If a pre-trained PatchCore checkpoint exists in the patch_core_pt/ directory, the scripts will include it in the comparison. If not, they will gracefully run the evaluation for WEDGE-Net only.
 ---
 ## 📂 Directory Structure
 
