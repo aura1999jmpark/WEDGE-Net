@@ -24,6 +24,16 @@ Figure 1: Overview of WEDGE-Net architecture.
 - Torchvision
 - Scipy, Scikit-learn, Tqdm, Matplotlib
 
+---
+
+## 🛠️ Installation
+```bash
+git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
+cd WEDGE-Net
+pip install -r requirements.txt
+
+
+
 - ## ⚙️ Configuration (`config.py`)
 
 You can control all experimental settings in `config.py`. Key parameters are explained below:
@@ -96,13 +106,5 @@ WEDGE-Net/
     │   └── results/
     │       └── tile/       # Visualization Figures
     └── 1pct/               # Extreme Compression (1% Coreset)
-
----
-
-## 🛠️ Installation
-```bash
-git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
-cd WEDGE-Net
-pip install -r requirements.txt
 
 
