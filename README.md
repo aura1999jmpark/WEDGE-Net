@@ -104,7 +104,7 @@ WEDGE-Net/
     │       └── tile/       # Visualization Figures
     └── 1pct/               # Extreme Compression (1% Coreset)
 
-## Installation
+## 🛠️ Installation
 ```bash
 git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
 cd WEDGE-Net
