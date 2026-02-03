@@ -34,7 +34,7 @@ pip install -r requirements.txt
 
 ---
 
-- ## ⚙️ Configuration (`config.py`)
+## ⚙️ Configuration (`config.py`)
 
 You can control all experimental settings in `config.py`. Key parameters are explained below:
 
