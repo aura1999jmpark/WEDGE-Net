@@ -19,7 +19,7 @@ Figure 1: Overview of WEDGE-Net architecture.
 - Noise Robust: Filters out environmental noise using DWT (Frequency Stream).
 
 ## Dependencies
-- Python 3.8+
+- Python 3.9+
 - PyTorch 1.10+
 - Torchvision
 - Scipy, Scikit-learn, Tqdm, Matplotlib
