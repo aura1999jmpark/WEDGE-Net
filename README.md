@@ -87,7 +87,18 @@ python test.py
 ) will be generated, documenting the performance improvements.
 
 ---
+---
 
+## 🛡️ Robustness Experiments (Quantitative Analysis)
+We provide evaluation scripts to reproduce the robustness experiments (Figure 6) demonstrated in the paper. These scripts measure AUROC scores under varying environmental distortions and automatically generate result graphs (`.png`) and data tables (`.csv`).
+
+### 1. Gaussian Noise Robustness
+Evaluates the model's stability against image noise ($\sigma = 0 \sim 40$).
+
+```bash
+python eval_noise_robustness.py
+```
+---
 ## 📂 Directory Structure
 
 After training and testing, your directory structure will look like this:
