@@ -97,7 +97,7 @@ Evaluates the model's stability against image noise ($\sigma = 0 \sim 40$).
 ```bash
 python eval_noise_robustness.py
 ```
-> **Output:** full_noise_comparison_smoothed_{CATEGORY}_{RATIO}.csv: AUROC scores for each noise level. figure_noise_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.
+> **Output:** full_noise_comparison_smoothed_{CATEGORY}_{RATIO}.csv: AUROC scores for each noise level. figure5_noise_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.(matches Figure 5 in the paper).
 
 ### 2. Color Jitter Robustness
 Evaluates the model's stability against domain shifts (Brightness, Contrast, Saturation, Hue).
@@ -107,6 +107,25 @@ python eval_color_robustness.py
 > **Output:** final_color_comparison_{CATEGORY}_{RATIO}.csv: AUROC scores for each intensity factor (0.0 ~ 3.0). figure6_color_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph (matches Figure 6 in the paper).
 > 
 > **Note:** Comparison with Baseline: If a pre-trained PatchCore checkpoint exists in the patch_core_pt/ directory, the scripts will include it in the comparison. If not, they will gracefully run the evaluation for WEDGE-Net only.
+
+### 3. Qualitative Analysis: Gaussian Noise (Visualization)
+Visualizes the anomaly maps of normal samples under increasing Gaussian noise levels to demonstrate stability.
+```bash
+python visualize_noise_robustness.py
+```
+> **Output:** Figure_Noise_Robustness_{CATEGORY}.png (4x4 Visualization Tile)
+
+### 4. Qualitative Analysis: Color Jitter (Visualization)  
+Visualizes the anomaly maps under domain shifts (Brightness, Contrast, Saturation) to verify that the model does not misclassify altered normal images.
+```bash
+python visualize_color_robustness.py
+```
+> **Output:** Figure_Color_Robustness_{CATEGORY}_Final.png (4x4 Visualization Tile)
+>
+> > **Note:** Dynamic Loading: The scripts automatically load the WEDGE-Net model corresponding to the SAMPLING_RATIO set in config.py.
+
+PatchCore Handling: If the PatchCore checkpoint is missing, the script will not crash. Instead, the PatchCore column in the output figure will be displayed as "Skipped (Gray)" or blank, allowing you to verify WEDGE-Net's results independently.
+
 ---
 ## 📂 Directory Structure
 
