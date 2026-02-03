@@ -122,8 +122,10 @@ python visualize_color_robustness.py
 ```
 > **Output:** Figure_Color_Robustness_{CATEGORY}_Final.png (4x4 Visualization Tile)
 >
-> **Note:** Dynamic Loading: The scripts automatically load the WEDGE-Net model corresponding to the SAMPLING_RATIO set in config.py.
-> PatchCore Handling: If the PatchCore checkpoint is missing, the script will not crash. Instead, the PatchCore column in the output figure will be displayed as "Skipped (Gray)" or blank, allowing you to verify WEDGE-Net's results independently.
+> **Note:**
+>
+> - **Dynamic Loading:** The scripts automatically load the WEDGE-Net model corresponding to the `SAMPLING_RATIO` set in `config.py`.
+> - **PatchCore Handling:** If the PatchCore checkpoint is missing, the script will **not crash**. Instead, the PatchCore column in the output figure will be displayed as **"Skipped (Gray)"** or blank, allowing you to verify WEDGE-Net's results independently.
 
 ---
 ## 📂 Directory Structure
