@@ -49,14 +49,60 @@ You can control all experimental settings in `config.py`. Key parameters are exp
 
 ---
 
-## Usage Guide
+## 🚀 Usage Guide
 
 ### 1. Training (Feature Extraction & Coreset Sampling)
-This script extracts features from normal training images and saves the memory bank (`.pt` file).
-
-How to run:
+This script extracts features from normal training images and builds the memory bank (`.pt` file).
 ```bash
+# To train the category and ratio specified in config.py
 python train.py
+```
+> **Note:** If `SAMPLING_RATIO` is set to `'all'`, the script automatically generates sub-folders for **100pct**, **10pct**, and **1pct** under your `SAVE_DIR`.
+
+### 2. Evaluation (Performance Metric)
+Calculate the Image-level AUROC to verify the model's detection performance.
+```bash
+# To calculate AUROC for the trained model
+python evaluation.py
+```
+> **Output:** It will print the AUROC score (e.g., `[tile] Image-level AUROC: 0.9912`) based on the current configuration.
+
+### 3. Visualization (Qualitative Analysis)
+Generate 6-column qualitative result figures, including Frequency and Semantic Attention Maps (corresponding to Figure 3 in the paper).
+```bash
+# To generate visualization results
+python test.py
+```
+> **Results:** Output images are saved in `[SAVE_DIR]/[RATIO]/results/[CATEGORY]/`. These figures highlight how the **Proposed Baseline** captures high-frequency structures and semantic context.
+
+### 4. Comparison (Semantic Gap Analysis)
+Perform a gap analysis between the proposed model (Semantic ON) and the reference model (Semantic OFF).
+```bash
+# To perform gap analysis and export results
+python evaluation_gap.py
+```
+> **Output:** A comprehensive CSV file (`result_gap_via_sem_onoff.csv`) will be generated, documenting the performance improvements.
+
+---
+
+## 📂 Directory Structure
+
+After training and testing, your directory structure will look like this:
+
+```text
+WEDGE-Net/
+├── config.py
+├── train.py
+├── evaluation.py
+├── test.py
+├── mvtec_ad/               # Dataset root
+└── [SAVE_DIR]/             # e.g., WEDGE-Net_realC/
+    ├── 100pct/             # Full Memory Bank
+    ├── 10pct/              # Proposed Baseline (10% Coreset)
+    │   ├── model_data_tile_10pct.pt
+    │   └── results/
+    │       └── tile/       # Visualization Figures
+    └── 1pct/               # Extreme Compression (1% Coreset)
 
 ## Installation
 ```bash
