@@ -32,7 +32,7 @@ git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/a
 cd WEDGE-Net
 pip install -r requirements.txt
 
-
+---
 
 - ## ⚙️ Configuration (`config.py`)
 
