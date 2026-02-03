@@ -104,7 +104,8 @@ Evaluates the model's stability against domain shifts (Brightness, Contrast, Sat
 ```bash
 python eval_color_robustness.py
 ```
-> **Output:** final_color_comparison_{CATEGORY}_{RATIO}.csv: AUROC scores for each intensity factor ($0.0 \sim 3.0$). figure6_color_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph (matches Figure 6 in the paper).
+> **Output:** final_color_comparison_{CATEGORY}_{RATIO}.csv: AUROC scores for each intensity factor (0.0 ~ 3.0). figure6_color_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph (matches Figure 6 in the paper).
+> 
 > **Note:** Comparison with Baseline: If a pre-trained PatchCore checkpoint exists in the patch_core_pt/ directory, the scripts will include it in the comparison. If not, they will gracefully run the evaluation for WEDGE-Net only.
 ---
 ## 📂 Directory Structure
