@@ -24,13 +24,7 @@ Figure 1: Overview of WEDGE-Net architecture.
 - Torchvision
 - Scipy, Scikit-learn, Tqdm, Matplotlib
 
-## Installation
-```bash
-git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
-cd WEDGE-Net
-pip install -r requirements.txt
-
-## ⚙️ Configuration (`config.py`)
+- ## ⚙️ Configuration (`config.py`)
 
 You can control all experimental settings in `config.py`. Key parameters are explained below:
 
@@ -55,7 +49,7 @@ You can control all experimental settings in `config.py`. Key parameters are exp
 
 ---
 
-## 🚀 Usage Guide
+## Usage Guide
 
 ### 1. Training (Feature Extraction & Coreset Sampling)
 This script extracts features from normal training images and saves the memory bank (`.pt` file).
@@ -63,3 +57,11 @@ This script extracts features from normal training images and saves the memory b
 How to run:
 ```bash
 python train.py
+
+## Installation
+```bash
+git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
+cd WEDGE-Net
+pip install -r requirements.txt
+
+
