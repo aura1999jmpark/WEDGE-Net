@@ -275,7 +275,7 @@ def run_full_evaluation():
     plt.legend(fontsize=12)
     plt.ylim(50, 105) # AUROC range
     
-    fig_name = f"figure_noise_robustness_{CATEGORY}_{RATIO_FOLDER}.png"
+    fig_name = f"figure5_noise_robustness_{CATEGORY}_{RATIO_FOLDER}.png"
     plt.savefig(os.path.join(SAVE_DIR, fig_name), dpi=300, bbox_inches='tight')
     print(f"[Info] Graph Saved: {os.path.join(SAVE_DIR, fig_name)}")
 
