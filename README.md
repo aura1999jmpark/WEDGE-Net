@@ -31,7 +31,7 @@ Figure 1: Overview of WEDGE-Net architecture.
 git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
 cd WEDGE-Net
 pip install -r requirements.txt
-
+```
 ---
 
 ## ⚙️ Configuration (`config.py`)
