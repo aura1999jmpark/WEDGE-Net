@@ -18,6 +18,12 @@ Figure 1: Overview of WEDGE-Net architecture.
 - Memory Efficient: Uses only 10% of the memory bank via Greedy Coreset.
 - Noise Robust: Filters out environmental noise using DWT (Frequency Stream).
 
+## Dependencies
+- Python 3.8+
+- PyTorch 1.10+
+- Torchvision
+- Scipy, Scikit-learn, Tqdm, Matplotlib
+
 ## 🛠️ Installation
 ```bash
 git clone [https://github.com/aura1999jmpark/WEDGE-Net.git](https://github.com/aura1999jmpark/WEDGE-Net.git)
