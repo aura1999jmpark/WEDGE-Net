@@ -98,7 +98,7 @@ python test.py
 
 ---
 
-## 🛡️ Robustness Experiments (Quantitative Analysis)
+## 🛡️ Robustness Experiments
 We provide evaluation scripts to reproduce the robustness experiments (Figure 6) demonstrated in the paper. These scripts measure AUROC scores under varying environmental distortions and automatically generate result graphs (`.png`) and data tables (`.csv`).
 
 ### 1. Gaussian Noise Robustness
