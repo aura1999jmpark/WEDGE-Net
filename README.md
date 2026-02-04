@@ -163,8 +163,9 @@ python eval_gap_score.py
 ## 📂 Directory Structure
 
 After setting up and running experiments, your directory structure should look like this.
-> **Note:** The default `SAVE_DIR` is set to `WEDGE-Net`.
-
+> **Note:**
+> 1. The default `SAVE_DIR` is set to `WEDGE-Net`.
+> 2. **Sub-folders (e.g., `10pct/`, `1pct/`) are automatically created** inside `SAVE_DIR` based on your `SAMPLING_RATIO` setting, and the trained `.pt` files are saved there.
 ```text
 WEDGE-Net/
 ├── config.py                 # Main Configuration
