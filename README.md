@@ -147,6 +147,7 @@ python eval_gap_score.py
 > **Prerequisite:** You must set SemanticOFF_DIR in config.py to point to a model trained with USE_SEMANTIC=False.
 > 
 > **Output:** Console table showing Gap (OFF) vs Gap (ON) and Improvement %.
+> 
 > result_gap_via_sem_onoff.csv saved in the directory specified by SemanticON_DIR in config.py.
 ---
 ## 📂 Directory Structure
