@@ -194,5 +194,5 @@ WEDGE-Net/
 > To reproduce the Discussion (Table 7), you must train a separate model with the Semantic Module disabled.
 > 1. Open `config.py`.
 > 2. Change `USE_SEMANTIC = False`.
-> 3. Change `SAVE_DIR = "checkpoints_C_SemanticOFF"` (or any name you prefer).
+> 3. Change `SAVE_DIR = "WEDGE-Net_Sem_OFF"` (or any name you prefer).
 > 4. Run `python train.py`.
