@@ -80,9 +80,13 @@ To reproduce the specific figures and tables in the paper, you need to specify t
 
 ## 🚀 Usage Guide
 
-### 1. Training (Feature Extraction & Memory Bank Construction)
-This script extracts frequency-aware features from normal training images and compresses them into a memory bank (`.pt` file) using the Coreset algorithm. The training configuration (Category, Ratio, etc.) is fully controlled by `config.py`.
+### 1. Training (Feature Extraction & Memory Bank)
+Extracts features from training images and constructs the memory bank (`.pt` file). All settings are controlled via `config.py`.
 
+**Key Configurations to Check:**
+- `CATEGORY`: Target class (e.g., `'tile'` or `'all'`).
+- `SAMPLING_RATIO`: Memory size to retain (e.g., `0.1` for 10%, `0.01` for 1%, or `'all'`).
+- `SAMPLING_METHOD`: Sampling strategy (`'coreset'` or `'random'`).
 ```bash
 python train.py
 ```
