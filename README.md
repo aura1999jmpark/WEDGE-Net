@@ -20,7 +20,7 @@ Figure 1: Overview of WEDGE-Net architecture.
 - **Plug-and-Play:** Simple architecture compatible with standard ResNet backbones.
 
 ## Dependencies
-- Python 3.9+
+- Python 3.9
 - PyTorch 1.10+
 - Torchvision
 - Scipy, Scikit-learn, Tqdm, Matplotlib
