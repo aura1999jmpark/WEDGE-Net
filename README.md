@@ -145,7 +145,7 @@ Script to reproduce **Table 7 (Analysis of Anomaly Score Margin)** from the Disc
 python eval_gap_score.py
 ```
 > [!IMPORTANT]
-> **Prerequisite:** You must set SemanticOFF_DIR in config.py to point to a model trained with USE_SEMANTIC=False.
+> **Prerequisite: You must set SemanticOFF_DIR in config.py to point to a model trained with USE_SEMANTIC=False.**
 > 
 > **Output:**
 > - Console table showing Gap (OFF) vs Gap (ON) and Improvement %.
