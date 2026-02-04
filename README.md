@@ -188,6 +188,7 @@ WEDGE-Net/
     │                         # * Used for Table 7 (Score Gap Analysis).
     └── 10pct/                # * Created by changing settings in config.py (see below).
         └── model_data_tile_10pct.pt
+```
 > [!IMPORTANT]
 > **How to generate the WEDGE-Net_Sem_OFF folder:**
 > To reproduce the Discussion (Table 7), you must train a separate model with the Semantic Module disabled.
