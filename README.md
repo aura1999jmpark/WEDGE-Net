@@ -117,6 +117,9 @@ Evaluates the model's stability against image noise ($\sigma = 0 \sim 40$).
 python eval_noise_robustness.py
 ```
 > **Output:** full_noise_comparison_smoothed_{CATEGORY}_{RATIO}.csv: AUROC scores for each noise level. figure5_noise_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.(matches Figure 5 in the paper).
+>
+> **Note:** Comparison with Baseline: If a pre-trained PatchCore checkpoint exists in the patch_core_pt/ directory, the scripts will include it in the comparison. If not, they will gracefully run the evaluation for WEDGE-Net only.
+
 
 ### 2. Color Jitter Robustness
 Evaluates the model's stability against domain shifts (Brightness, Contrast, Saturation, Hue).
