@@ -54,7 +54,7 @@ You can control all experimental settings in `config.py`. Key parameters are exp
 ### 3. Sampling & Memory Bank
 | Parameter | Description |
 | :--- | :--- |
-| `SAVE_DIR` | **Root Directory** where the memory banks will be saved (e.g., `"WEDGE-Net_realC"`). |
+| `SAVE_DIR` | **Root Directory** where the memory banks will be saved (e.g., `"WEDGE-Net"`). |
 | `SAMPLING_RATIO` | Coreset sampling ratio. <br> **Note:** The script **automatically creates sub-folders** based on this value: <br> - `'all'` $\rightarrow$ Generates `100pct/`, `10pct/`, and `1pct/` folders simultaneously. <br> - `0.1` $\rightarrow$ Generates a `10pct/` folder. <br> - `0.01` $\rightarrow$ Generates a `1pct/` folder. |
 | `SAMPLING_METHOD` | `'coreset'` (Recommended) or `'random'`. |
 
