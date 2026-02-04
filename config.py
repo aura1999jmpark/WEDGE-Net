@@ -71,7 +71,7 @@ SAMPLING_METHOD = 'coreset'
 # 1. Main Proposed Model (Semantic ON)
 #    - Path to the model trained with USE_SEMANTIC=True
 #    - [NOTE] Change '10pct' to '1pct' or '100pct' if you want to evaluate other ratios.
-SemanticON_DIR = "WEDGE-Net/10pct"
+SemanticON_DIR = "WEDGE-Net"
 
 # 2. Internal Ablation Baseline (Semantic OFF)
 #    - Path to the model trained with USE_SEMANTIC=False
