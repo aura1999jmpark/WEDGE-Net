@@ -24,8 +24,7 @@ BATCH_SIZE = 32
 # Number of CPU workers for data loading.
 NUM_WORKERS = 4
 
-# Device setting is handled automatically in main scripts (cuda if available),
-# but you can force specific device indices here if needed.
+# Random Seed for reproducibility.
 SEED = 42
 
 # ==============================================================================
@@ -36,26 +35,23 @@ SEED = 42
 WAVELET_TYPE = 'haar'
 
 # Enable/Disable the Semantic Stream (ResNet Global Attention).
-# Set True for WEDGE-Net (Full), False for Frequency Stream Only (Ablation).
+# Set True for WEDGE-Net (Full Proposed Method).
+# Set False for Frequency Stream Only (Ablation Baseline).
 USE_SEMANTIC = True
 
 # ==============================================================================
 # [4] Memory Bank & Sampling Configuration
 # ==============================================================================
 # Directory where the trained memory banks (.pt files) will be saved.
-# If the directory does not exist, it will be automatically created.
-# NOTE: If this variable is not specified, a 'WEDGE-Net' folder will be created 
-#       by default, and the .pt files will be saved there.
+# NOTE: Main training scripts use this variable to save models.
 SAVE_DIR = "WEDGE-Net_realC"
-
 
 # Ratio of features to retain in the memory bank.
 # Options:
 #   1.0   : 100% (Full Memory)
 #   0.1   : 10% (WEDGE-Net Default)
 #   0.01  : 1% (Extreme Compression)
-#   'all' : Automatically generate and save all three versions (100%, 10%, 1%)
-#           in their respective sub-folders.
+#   'all' : Automatically generate and save all three versions.
 SAMPLING_RATIO = '0.1'
 
 # Sampling Strategy to use when SAMPLING_RATIO < 1.0.
@@ -63,16 +59,42 @@ SAMPLING_RATIO = '0.1'
 #   'coreset' : K-Center Greedy (Recommended, preserves manifold boundaries)
 #   'random'  : Random subsampling (Faster, but less accurate)
 SAMPLING_METHOD = 'coreset'
-#SAMPLING_METHOD = 'random'
+# SAMPLING_METHOD = 'random'
 
 # ==============================================================================
-# [5] Path Configuration for Gap Comparison
+# [5] Path Configuration for Evaluation & Visualization
 # ==============================================================================
-# Directory for our main proposed model (Semantic ON)
-OurModel_DIR = "WEDGE-Net"
+# -------------------------------------------------------
+# A. Directory Definitions (Physical Paths)
+# -------------------------------------------------------
+# 1. Main Proposed Model (Semantic ON)
+#    - Path to the model trained with USE_SEMANTIC=True
+SemanticON_DIR = "WEDGE-Net_realC/10pct"
 
-# Directory for the comparison model (Semantic OFF / Reference)
-CompareModel_DIR = "patch_core_pt"
+# 2. Internal Ablation Baseline (Semantic OFF)
+#    - Path to the model trained with USE_SEMANTIC=False
+#    - Used ONLY for Table 6 (Score Gap Analysis)
+SemanticOFF_DIR = "checkpoints_C_SemanticOFF"
 
-# Result CSV Filename (Saved inside OurModel_DIR)
+# 3. External SOTA Comparison (PatchCore)
+#    - Used for Figure 5 & 6 (Noise/Color Robustness)
+#    - [IMPORTANT] Please specify the directory containing the PatchCore .pt files.
+PatchCore_DIR = "patch_core_pt"
+
+# -------------------------------------------------------
+# B. Backward Compatibility (Aliasing)
+#    * Do not modify this section unless you change the scripts.
+# -------------------------------------------------------
+
+# 'OurModel_DIR' is used by visualization scripts (Figures) and Gap Analysis.
+OurModel_DIR = SemanticON_DIR
+
+# 'CompareModel_DIR' is used by Noise/Color Robustness scripts (Figures 5, 6).
+# For these figures, we compare against PatchCore (SOTA).
+CompareModel_DIR = PatchCore_DIR
+
+# ==============================================================================
+# [6] Result Output Configuration
+# ==============================================================================
+# Result CSV Filename for Ablation Study (Saved inside SemanticON_DIR)
 GAP_RESULT_CSV = "result_gap_via_sem_onoff.csv"
