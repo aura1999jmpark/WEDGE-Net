@@ -64,7 +64,7 @@ To reproduce the specific figures and tables in the paper, you need to specify t
 | Parameter | Description |
 | :--- | :--- |
 | `SemanticON_DIR` | Path to the main proposed model (WEDGE-Net). <br> *Used in: Visualization, Gap Analysis* |
-| `SemanticOFF_DIR` | Path to the baseline model trained with `USE_SEMANTIC=False`. <br> *Used in: Table 6 (Score Gap Analysis)* |
+| `SemanticOFF_DIR` | Path to the baseline model trained with `USE_SEMANTIC=False`. <br> *Used in: Table 7 (Analysis of Anomaly Score Margins)* |
 | `PatchCore_DIR` | Path to pre-trained PatchCore models (.pt files). <br> *Used in: Figure 5 & 6 (Robustness Experiments)* |
 
 ---
