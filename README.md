@@ -13,10 +13,11 @@ Official PyTorch Implementation of WEDGE-Net
 Figure 1: Overview of WEDGE-Net architecture.
 <img width="2848" height="1504" alt="architecture11" src="https://github.com/user-attachments/assets/c7ea825a-0dc3-4314-bffb-500036c661b4" />
 
-## Key Features
-- Extreme Efficiency: 7.1x faster inference (270 FPS) compared to PatchCore.
-- Memory Efficient: Uses only 10% of the memory bank via Greedy Coreset.
-- Noise Robust: Filters out environmental noise using DWT (Frequency Stream).
+## ✨ Key Features
+- **Extreme Efficiency:** 7.1x faster inference (**270 FPS**) compared to PatchCore.
+- **Memory Efficient:** Uses only **10%** of the memory bank via Greedy Coreset.
+- **Noise Robust:** Filters out environmental noise using DWT (Frequency Stream).
+- **Plug-and-Play:** Simple architecture compatible with standard ResNet backbones.
 
 ## Dependencies
 - Python 3.9+
@@ -38,7 +39,7 @@ pip install -r requirements.txt
 
 You can control all experimental settings in `config.py`. Key parameters are explained below:
 
-### 1. **Dataset & Category**
+### 1. Dataset & Category
 | Parameter | Description |
 | :--- | :--- |
 | `DATA_PATH` | Path to the MVTec AD dataset root (default: `./mvtec_ad`) |
@@ -56,6 +57,15 @@ You can control all experimental settings in `config.py`. Key parameters are exp
 | `SAVE_DIR` | Directory where the trained memory banks (`.pt`) will be saved. |
 | `SAMPLING_RATIO` | Coreset sampling ratio. <br> - `1.0`: 100% (Full Memory) <br> - `0.1`: 10% (Proposed) <br> - `'all'`: Generates 100%, 10%, and 1% versions simultaneously. |
 | `SAMPLING_METHOD` | `'coreset'` (Recommended) or `'random'`. |
+
+### 4. Path Configuration (Comparison & Ablation)
+To reproduce the specific figures and tables in the paper, you need to specify the model paths in `config.py`:
+
+| Parameter | Description |
+| :--- | :--- |
+| `SemanticON_DIR` | Path to the main proposed model (WEDGE-Net). <br> *Used in: Visualization, Gap Analysis* |
+| `SemanticOFF_DIR` | Path to the baseline model trained with `USE_SEMANTIC=False`. <br> *Used in: Table 6 (Score Gap Analysis)* |
+| `PatchCore_DIR` | Path to pre-trained PatchCore models (.pt files). <br> *Used in: Figure 5 & 6 (Robustness Experiments)* |
 
 ---
 
@@ -127,6 +137,22 @@ python visualize_color_robustness.py
 > - **Dynamic Loading:** The scripts automatically load the WEDGE-Net model corresponding to the `SAMPLING_RATIO` set in `config.py`.
 > - **PatchCore Handling:** If the PatchCore checkpoint is missing, the script will **not crash**. Instead, the PatchCore column in the output figure will be displayed as **"Skipped (Gray)"** or blank, allowing you to verify WEDGE-Net's results independently.
 
+### 5. Discussion: Score Gap Analysis
+
+Script to reproduce **Table 7 (Analysis of Anomaly Score Margin)** from the Discussion section. This analysis verifies how the Semantic Module improves the separation between normal and defect distributions.
+
+```bash
+python eval_ablation_score_gap.py
+```
+> **Prerequisite:** You must set SemanticOFF_DIR in config.py to point to a model trained with USE_SEMANTIC=False.
+> **Output:** Console table showing Gap (OFF) vs Gap (ON) and Improvement %.
+> result_gap_via_sem_onoff.csv saved in the directory specified by SemanticON_DIR in config.py.
+
+Output:
+
+Console table showing Gap (OFF) vs Gap (ON) and Improvement %.
+
+result_gap_via_sem_onoff.csv saved in the model directory.
 ---
 ## 📂 Directory Structure
 
