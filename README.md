@@ -55,7 +55,7 @@ You can control all experimental settings in `config.py`. Key parameters are exp
 | Parameter | Description |
 | :--- | :--- |
 | `SAVE_DIR` | Directory where the trained memory banks (`.pt`) will be saved. |
-| `SAMPLING_RATIO` | Coreset sampling ratio. <br> - `1.0`: 100% (Full Memory) <br> - `0.1`: 10% (Proposed) <br> - `0.01`: 1% (Extreme) <br> - `'all'`: Generates 100%, 10%, and 1% versions simultaneously. |
+| `SAMPLING_RATIO` | Coreset or Random sampling ratio. <br> - `1.0`: 100% (Full Memory) <br> - `0.1`: 10% (Proposed) <br> - `0.01`: 1% (Extreme) <br> - `'all'`: Generates 100%, 10%, and 1% versions simultaneously. |
 | `SAMPLING_METHOD` | `'coreset'` (Recommended) or `'random'`. |
 
 ### 4. Path Configuration (Comparison & Ablation)
