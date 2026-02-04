@@ -137,7 +137,7 @@ python visualize_color_robustness.py
 > - **Dynamic Loading:** The scripts automatically load the WEDGE-Net model corresponding to the `SAMPLING_RATIO` set in `config.py`.
 > - **PatchCore Handling:** If the PatchCore checkpoint is missing, the script will **not crash**. Instead, the PatchCore column in the output figure will be displayed as **"Skipped (Gray)"** or blank, allowing you to verify WEDGE-Net's results independently.
 ---
-## Discussion: Anomaly Score Margin
+## Discussion: Score Gap Analysis
 
 Script to reproduce **Table 7 (Analysis of Anomaly Score Margin)** from the Discussion section. This analysis verifies how the Semantic Module improves the separation between normal and defect distributions.
 
