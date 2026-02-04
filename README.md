@@ -185,8 +185,10 @@ WEDGE-Net/
 ├── mvtec_ad/                 # [Dataset] MVTec AD Root
 │
 ├── patch_core_pt/            # [Comparison] External SOTA Models
-│   │                         # * Create this folder manually to reproduce Fig 5 & 6.
-│   └── model_data_tile.pt    # Place pre-trained PatchCore models here.
+│   │                         # * To reproduce Fig 5 & 6 comparison:
+│   │                         #   Train PatchCore (WideResNet-50) using the official repo
+│   │                         #   and place the .pt files here.
+│   └── model_data_tile.pt    # (Optional)
 │
 ├── WEDGE-Net/                # [Default SAVE_DIR] Proposed Model (Semantic ON)
 │   ├── 100pct/               # Full Memory Bank
