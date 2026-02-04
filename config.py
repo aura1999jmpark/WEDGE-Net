@@ -71,11 +71,13 @@ SAMPLING_METHOD = 'coreset'
 # -------------------------------------------------------
 # 1. Main Proposed Model (Semantic ON)
 #    - Path to the model trained with USE_SEMANTIC=True
+#    - [NOTE] Change '10pct' to '1pct' or '100pct' if you want to evaluate other ratios.
 SemanticON_DIR = "WEDGE-Net/10pct"
 
 # 2. Internal Ablation Baseline (Semantic OFF)
 #    - Path to the model trained with USE_SEMANTIC=False
-#    - Used ONLY for Table 6 (Score Gap Analysis)
+#    - Used ONLY for Table 7 (Score Gap Analysis)
+#    - [NOTE] Ensure the ratio matches SemanticON_DIR (e.g., if testing 1pct, point this to the 1pct OFF model).
 SemanticOFF_DIR = "WEDGE-Net_Sem_off/10pct"
 
 # 3. External SOTA Comparison (PatchCore)
