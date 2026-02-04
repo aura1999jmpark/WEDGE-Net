@@ -11,19 +11,17 @@ DATA_PATH = './mvtec_ad'
 #          'metal_nut', 'pill', 'screw', 'tile', 'toothbrush', 'transistor', 'wood', 'zipper'
 # Set to 'all' to process all categories sequentially.
 CATEGORY = 'tile'
+#CATEGORY = 'all'
 
 # ==============================================================================
 # [2] System & Training Configuration
 # ==============================================================================
 # Input image size (Resize). Standard PatchCore uses 224 or 256.
 IMAGE_SIZE = 224
-
 # Batch size for feature extraction.
 BATCH_SIZE = 32
-
 # Number of CPU workers for data loading.
 NUM_WORKERS = 4
-
 # Random Seed for reproducibility.
 SEED = 42
 
@@ -55,6 +53,7 @@ SAVE_DIR = "WEDGE-Net"
 #   0.01  : 1% (Extreme Compression)
 #   'all' : Automatically generate and save all three versions.
 SAMPLING_RATIO = '0.1'
+#SAMPLING_RATIO = 'all'
 
 # Sampling Strategy to use when SAMPLING_RATIO < 1.0.
 # Options: 
