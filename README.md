@@ -80,13 +80,16 @@ To reproduce the specific figures and tables in the paper, you need to specify t
 
 ## 🚀 Usage Guide
 
-### 1. Training (Feature Extraction & Coreset Sampling)
-This script extracts features from normal training images and builds the memory bank (`.pt` file).
+### 1. Training (Feature Extraction & Memory Bank Construction)
+This script extracts frequency-aware features from normal training images and compresses them into a memory bank (`.pt` file) using the Coreset algorithm. The training configuration (Category, Ratio, etc.) is fully controlled by `config.py`.
+
 ```bash
-# To train the category and ratio specified in config.py
 python train.py
 ```
-> **Note:** If `SAMPLING_RATIO` is set to `'all'`, the script automatically generates sub-folders for **100pct**, **10pct**, and **1pct** under your `SAVE_DIR`.
+> **Note:**
+>
+> - Multi-Ratio Mode: If SAMPLING_RATIO is set to 'all', the script automatically generates sub-folders for **100pct**, **10pct**, and **1pct** under your SAVE_DIR.
+> - Multi-Category Mode: If CATEGORY is set to 'all', the script sequentially processes **all 15 MVTec AD categories** (from Bottle to Zipper) and saves the trained models into the sub-folder corresponding to your SAMPLING_RATIO.
 
 ### 2. Evaluation (Performance Metric)
 Calculate the Image-level AUROC to verify the model's detection performance.
