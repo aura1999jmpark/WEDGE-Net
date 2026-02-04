@@ -162,21 +162,36 @@ python eval_gap_score.py
 ---
 ## 📂 Directory Structure
 
-After training and testing, your directory structure will look like this:
+After setting up and running experiments, your directory structure should look like this.
+> **Note:** The default `SAVE_DIR` is set to `WEDGE-Net`.
 
 ```text
 WEDGE-Net/
-├── config.py
-├── train.py
-├── evaluation.py
-├── test.py
-├── mvtec_ad/               # Dataset root
-└── [SAVE_DIR]/             # e.g., WEDGE-Net_realC/
-    ├── 100pct/             # Full Memory Bank
-    ├── 10pct/              # Proposed Baseline (10% Coreset)
-    │   ├── model_data_tile_10pct.pt
-    │   └── results/
-    │       └── tile/       # Visualization Figures
-    └── 1pct/               # Extreme Compression (1% Coreset)
-
-
+├── config.py                 # Main Configuration
+├── train.py                  # Training Script
+├── evaluation.py             # Evaluation Script
+├── test.py                   # Visualization Script
+├── mvtec_ad/                 # [Dataset] MVTec AD Root
+│
+├── patch_core_pt/            # [Comparison] External SOTA Models
+│   │                         # * Create this folder manually to reproduce Fig 5 & 6.
+│   └── model_data_tile.pt    # Place pre-trained PatchCore models here.
+│
+├── WEDGE-Net/                # [Default SAVE_DIR] Proposed Model (Semantic ON)
+│   ├── 100pct/               # Full Memory Bank
+│   ├── 10pct/                # Proposed Baseline (10% Coreset)
+│   │   ├── model_data_tile_10pct.pt
+│   │   └── results/          # Visualization Figures (Fig 3)
+│   └── 1pct/                 # Extreme Compression
+│
+└── WEDGE-Net_Sem_OFF/# [Discussion] Semantic OFF Model
+    │                         # * Used for Table 7 (Score Gap Analysis).
+    └── 10pct/                # * Created by changing settings in config.py (see below).
+        └── model_data_tile_10pct.pt
+> [!IMPORTANT]
+> **How to generate the WEDGE-Net_Sem_OFF folder:**
+> To reproduce the Discussion (Table 7), you must train a separate model with the Semantic Module disabled.
+> 1. Open `config.py`.
+> 2. Change `USE_SEMANTIC = False`.
+> 3. Change `SAVE_DIR = "checkpoints_C_SemanticOFF"` (or any name you prefer).
+> 4. Run `python train.py`.
