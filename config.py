@@ -33,18 +33,20 @@ SEED = 42
 # Wavelet Kernel Type for the Frequency Stream.
 # Options: 'haar' (Hardware-efficient, sharp edges), 'bior2.2' (Smoother boundaries)
 WAVELET_TYPE = 'haar'
+#WAVELET_TYPE = 'bior2.2'
 
 # Enable/Disable the Semantic Stream (ResNet Global Attention).
 # Set True for WEDGE-Net (Full Proposed Method).
 # Set False for Frequency Stream Only (Ablation Baseline).
 USE_SEMANTIC = True
+#USE_SEMANTIC = False
 
 # ==============================================================================
 # [4] Memory Bank & Sampling Configuration
 # ==============================================================================
 # Directory where the trained memory banks (.pt files) will be saved.
 # NOTE: Main training scripts use this variable to save models.
-SAVE_DIR = "WEDGE-Net_realC"
+SAVE_DIR = "WEDGE-Net"
 
 # Ratio of features to retain in the memory bank.
 # Options:
@@ -69,12 +71,12 @@ SAMPLING_METHOD = 'coreset'
 # -------------------------------------------------------
 # 1. Main Proposed Model (Semantic ON)
 #    - Path to the model trained with USE_SEMANTIC=True
-SemanticON_DIR = "WEDGE-Net_realC/10pct"
+SemanticON_DIR = "WEDGE-Net/10pct"
 
 # 2. Internal Ablation Baseline (Semantic OFF)
 #    - Path to the model trained with USE_SEMANTIC=False
 #    - Used ONLY for Table 6 (Score Gap Analysis)
-SemanticOFF_DIR = "checkpoints_C_SemanticOFF"
+SemanticOFF_DIR = "WEDGE-Net_Sem_off/10pct"
 
 # 3. External SOTA Comparison (PatchCore)
 #    - Used for Figure 5 & 6 (Noise/Color Robustness)
