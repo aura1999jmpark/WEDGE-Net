@@ -92,8 +92,8 @@ python train.py
 ```
 > **Note:**
 >
-> - Multi-Ratio Mode: If SAMPLING_RATIO is set to 'all', the script automatically generates sub-folders for **100pct**, **10pct**, and **1pct** under your SAVE_DIR.
-> - Multi-Category Mode: If CATEGORY is set to 'all', the script sequentially processes **all 15 MVTec AD categories** (from Bottle to Zipper) and saves the trained models into the sub-folder corresponding to your SAMPLING_RATIO.
+> - Multi-Ratio Mode: If `SAMPLING_RATIO` is set to `'all'`, the script automatically generates sub-folders for **100pct**, **10pct**, and **1pct** under your `SAVE_DIR`.
+> - Multi-Category Mode: If `CATEGORY` is set to 'all', the script sequentially processes **all 15 MVTec AD categories** (from Bottle to Zipper) and saves the trained models into the sub-folder corresponding to your `SAMPLING_RATIO`.
 
 ### 2. Evaluation (Performance Metric)
 Calculate the Image-level AUROC to verify the model's detection performance.
