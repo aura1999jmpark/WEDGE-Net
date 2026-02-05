@@ -114,16 +114,16 @@ python test.py
 
 ### 4. Performance
 
-WEDGE-Net demonstrates **state-of-the-art inference speed**, suitable for real-time industrial edge applications. By significantly reducing the memory bank size while maintaining high accuracy, it achieves up to **7.1x speedup(10%)** compared to the full-memory baseline.
+We **propose the 10% memory bank setting** as the optimal configuration to ensure stability and robust detection performance while maintaining high-speed inference. Although the 1% setting achieves extreme speeds (over 700 FPS), the 10% setting offers the best balance for industrial applications.
 
-### ⚡ Inference Speed & Accuracy Comparison
-Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
+### ⚡ Inference Speed Comparison
+Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 3090.
 
-| Model | Memory Bank | AUROC (Avg) | FPS (Inference) | Speedup |
-| :--- | :---: | :---: | :---: | :---: |
-| PatchCore (Ref) | 100% | 99.2% | 37 | 1.0x |
-| **WEDGE-Net (Ours)** | 10% | 99.1% | **265** | **7.1x** |
-| **WEDGE-Net (Ours)** | 1% | 98.5% | 687 | 18.4x |
+| Model | Memory Bank | FPS (Inference) | Speedup |
+| :--- | :---: | :---: | :---: |
+| PatchCore (Ref) | 100% | 37 | 1.0x |
+| **WEDGE-Net (Ours)** | **10% (Proposed)** | **265** | **7.1x** |
+| WEDGE-Net (Ours) | 1% | 706 | 19.1x |
 **How to run:**
 1. Set the target ratio in `config.py` (e.g., `SAMPLING_RATIO = 0.01`).
 2. Run the benchmark script:
@@ -131,8 +131,8 @@ Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
    python benchmark_fps.py
    ```
 > **Note:**
-> * **FPS** values are averaged across all 15 MVTec AD categories (batch size = 1).
-> * **1% Coreset** setting delivers **680+ FPS**, enabling ultra-low latency processing on edge devices.
+> * **FPS** values are averaged across all 15 MVTec AD categories.
+> * The **1% setting** demonstrates the model's capability for extreme efficiency, reaching **706.2 FPS**, which is approx. 19x faster than the baseline.
 ---
 
 ## 🛡️ Robustness Experiments
