@@ -114,7 +114,7 @@ python test.py
 
 ### 4. Performance
 
-WEDGE-Net demonstrates **state-of-the-art inference speed**, suitable for real-time industrial edge applications. By significantly reducing the memory bank size while maintaining high accuracy, it achieves up to **18.4x speedup** compared to the full-memory baseline.
+WEDGE-Net demonstrates **state-of-the-art inference speed**, suitable for real-time industrial edge applications. By significantly reducing the memory bank size while maintaining high accuracy, it achieves up to **7.1x speedup(10%)** compared to the full-memory baseline.
 
 ### ⚡ Inference Speed & Accuracy Comparison
 Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
@@ -123,7 +123,7 @@ Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
 | :--- | :---: | :---: | :---: | :---: |
 | PatchCore (Ref) | 100% | 99.2% | 37 | 1.0x |
 | **WEDGE-Net (Ours)** | 10% | 99.1% | **265** | **7.1x** |
-| **WEDGE-Net (Ours)** | **1%** | **98.5%** | **687** | **18.4x** |
+| **WEDGE-Net (Ours)** | 1% | 98.5% | 687 | 18.4x |
 **How to run:**
 1. Set the target ratio in `config.py` (e.g., `SAMPLING_RATIO = 0.01`).
 2. Run the benchmark script:
