@@ -112,6 +112,22 @@ python test.py
 > **Results:** Output images are saved in `[SAVE_DIR]/[RATIO]/results/[CATEGORY]/`. These figures highlight how the **Proposed Baseline** captures high-frequency structures and semantic context.
 ) will be generated, documenting the performance improvements.
 
+### 4. Performance
+
+WEDGE-Net demonstrates **state-of-the-art inference speed**, suitable for real-time industrial edge applications. By significantly reducing the memory bank size while maintaining high accuracy, it achieves up to **18.4x speedup** compared to the full-memory baseline.
+
+### ⚡ Inference Speed & Accuracy Comparison
+Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
+
+| Model | Memory Bank | AUROC (Avg) | FPS (Inference) | Speedup |
+| :--- | :---: | :---: | :---: | :---: |
+| PatchCore (Ref) | 100% | 99.2% | 37 | 1.0x |
+| **WEDGE-Net (Ours)** | 10% | 99.1% | **265** | **7.1x** |
+| **WEDGE-Net (Ours)** | **1%** | **98.5%** | **687** | **18.4x** |
+
+> **Note:**
+> * **FPS** values are averaged across all 15 MVTec AD categories (batch size = 1).
+> * **1% Coreset** setting delivers **680+ FPS**, enabling ultra-low latency processing on edge devices.
 ---
 
 ## 🛡️ Robustness Experiments
