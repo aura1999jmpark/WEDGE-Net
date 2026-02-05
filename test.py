@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Agg') # Enable headless plotting for server environments
+matplotlib.use('Agg') # Enable headless plotting
 import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
@@ -9,11 +9,16 @@ import numpy as np
 import os
 from torchvision import transforms
 
-# Ensure correct imports based on your file structure
-
 from model import WEDGE_Net
 from dataset import MVTecDataset
 import config 
+
+# Define All Categories
+ALL_CATEGORIES = [
+    'bottle', 'cable', 'capsule', 'carpet', 'grid',
+    'hazelnut', 'leather', 'metal_nut', 'pill', 'screw',
+    'tile', 'toothbrush', 'transistor', 'wood', 'zipper'
+]
 
 def get_ratio_name(ratio):
     """Helper to match folder naming convention."""
@@ -23,7 +28,7 @@ def get_ratio_name(ratio):
     else: return f"{int(ratio*100)}pct"
 
 def normalize_map(m):
-    """Normalizes a feature map to [0, 1] range for visualization."""
+    """Normalizes a feature map to [0, 1] range."""
     m_min = m.min()
     m_max = m.max()
     if m_max - m_min > 1e-5:
@@ -32,198 +37,169 @@ def normalize_map(m):
 
 def test_inference():
     # =============================================================
-    # [1] Configuration & Path Setup
+    # [1] Configuration & Setup
     # =============================================================
-    category = config.CATEGORY
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
     base_dir = getattr(config, 'SAVE_DIR', 'WEDGE-Net')
+    
+    # 1. Determine Target Ratios
     raw_ratio = getattr(config, 'SAMPLING_RATIO', '0.1')
-    
-    if raw_ratio == 'all':
-        target_ratio = 0.1
+    if str(raw_ratio).lower() == 'all':
+        # Default to 0.1 if 'all' is selected for visualization to prevent overflow
+        print(" [Info] 'all' ratio selected. Defaulting to 10% (0.1) for visualization.")
+        target_ratios = [0.1]
     else:
-        target_ratio = float(raw_ratio)
-    
-    ratio_folder_name = get_ratio_name(target_ratio)
-    model_filename = f"model_data_{category}_{ratio_folder_name}.pt"
-    model_path = os.path.join(base_dir, ratio_folder_name, model_filename)
-    
-    print(f"==================================================")
-    print(f" [Test Setup] Generating 6-Column Visualization")
-    print(f" - Category : {category}")
-    print(f" - Model    : {model_path}")
-    print(f"==================================================")
+        target_ratios = [float(raw_ratio)]
+
+    # 2. Determine Target Categories
+    raw_cat = getattr(config, 'CATEGORY', 'all')
+    if str(raw_cat).lower() == 'all':
+        target_categories = ALL_CATEGORIES
+    else:
+        target_categories = [str(raw_cat)]
+
+    # Settings for visualization limit
+    MAX_IMAGES = 10  # Process only 10 images per category
 
     # =============================================================
-    # [2] Load Model
+    # [2] Main Loops (Ratio -> Category)
     # =============================================================
-    if not os.path.exists(model_path):
-        print(f"[Error] Model file not found at: {model_path}")
-        return
-        
-    checkpoint = torch.load(model_path, map_location=device)
-    memory_bank = checkpoint['memory_bank'].to(device)
-    
-    # Initialize Model
-    model = WEDGE_Net(use_semantic=config.USE_SEMANTIC).to(device)
-    model.eval()
-    
-    # =============================================================
-    # [3] Data & Vis Setup
-    # =============================================================
-    test_dataset = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-    
-    # Save results in: z_test/10pct/results/tile
-    save_dir = os.path.join(base_dir, ratio_folder_name, "results", category)
-    os.makedirs(save_dir, exist_ok=True)
-    
-    # Standard ImageNet Denormalization
-    inv_normalize = transforms.Normalize(
-        mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225],
-        std=[1/0.229, 1/0.224, 1/0.225]
-    )
+    for ratio in target_ratios:
+        ratio_folder_name = get_ratio_name(ratio)
+        print(f"\n" + "#"*60)
+        print(f" Processing Ratio: {ratio_folder_name}")
+        print(f"#"*60)
 
-    print(f"Saving 6-column figures to: {save_dir}")
-    
-    with torch.no_grad():
-        for i, (image, label, mask, img_path) in enumerate(test_loader):
-            # Process all images (remove 'if i >= 20: break' if you want all)
-            # if i >= 20: break 
+        for category in target_categories:
+            print(f"\n >> Category: {category.upper()} ({ratio_folder_name})")
+
+            # Path Setup
+            model_filename = f"model_data_{category}_{ratio_folder_name}.pt"
+            model_path = os.path.join(base_dir, ratio_folder_name, model_filename)
+            save_dir = os.path.join(base_dir, ratio_folder_name, "results", category)
             
-            filename = os.path.basename(img_path[0])
-            image = image.to(device)
+            # Check Model Existence
+            if not os.path.exists(model_path):
+                print(f"   [Skip] Model not found: {model_path}")
+                continue
+
+            # Load Model
+            try:
+                checkpoint = torch.load(model_path, map_location=device)
+                if 'memory_bank' in checkpoint:
+                    memory_bank = checkpoint['memory_bank'].to(device)
+                else:
+                    memory_bank = checkpoint.to(device)
+
+                model = WEDGE_Net(use_semantic=config.USE_SEMANTIC).to(device)
+                model.eval()
+            except Exception as e:
+                print(f"   [Error] Failed to load model: {e}")
+                continue
             
-            # ---------------------------------------------------------
-            # Forward Pass
-            # ---------------------------------------------------------
-            features, maps = model(image) 
-            
-            # 1. Anomaly Scoring (Euclidean Distance)
-            B, C, H, W = features.shape
-            features_flat = features.view(C, -1).permute(1, 0)
-            dists = torch.cdist(features_flat, memory_bank, p=2) 
-            min_dist, _ = torch.min(dists, dim=1)
-            
-            # 2. Process (e) Anomaly Score Map
-            score_map = min_dist.view(H, W).unsqueeze(0).unsqueeze(0)
-            score_map = F.interpolate(score_map, size=image.shape[2:], mode='bilinear', align_corners=False)
-            score_map = score_map.squeeze().cpu().numpy()
-            score_map = gaussian_filter(score_map, sigma=4.0) # Smoothing
-            
-            # 3. Process Maps for Visualization
-            # (a) Input Image
-            img_vis = inv_normalize(image.squeeze().cpu()).permute(1, 2, 0).numpy()
-            img_vis = np.clip(img_vis, 0, 1)
+            # Load Dataset
+            try:
+                test_dataset = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
+                test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+            except Exception as e:
+                print(f"   [Error] Failed to load dataset: {e}")
+                continue
 
-            # (b) Ground Truth (GT)
-            gt_vis = mask.squeeze().cpu().numpy()
-            
-            # =========================================================
-            # [CRITICAL FIX] Safe Dimension Handling for Visualization
-            # =========================================================
-            
-            # --- (c) Frequency Attention Map ---
-            if isinstance(maps, dict) and 'freq' in maps:
-                freq_raw = maps['freq']
-            elif isinstance(maps, (list, tuple)) and len(maps) > 0:
-                freq_raw = maps[0]
-            else:
-                freq_raw = torch.zeros_like(torch.tensor(score_map))
-            
-            if isinstance(freq_raw, torch.Tensor):
-                 # Ensure 4D [B, C, H, W] for interpolate
-                 if freq_raw.dim() == 3: freq_raw = freq_raw.unsqueeze(0)
-                 if freq_raw.dim() == 2: freq_raw = freq_raw.unsqueeze(0).unsqueeze(0)
-                 
-                 freq_vis = F.interpolate(freq_raw, size=image.shape[2:], mode='bilinear', align_corners=False)
-                 freq_vis = freq_vis.cpu().squeeze() # [C, H, W] or [H, W]
-                 
-                 # Only average if channels exist (Dim=3). If already 2D (Dim=2), do NOT average.
-                 if freq_vis.dim() == 3:
-                     if freq_vis.shape[0] == 1:
-                         freq_vis = freq_vis.squeeze(0)
-                     else:
-                         freq_vis = freq_vis.mean(dim=0)
-                 
-                 freq_vis = freq_vis.numpy()
-            else:
-                freq_vis = freq_raw
+            os.makedirs(save_dir, exist_ok=True)
 
-            # --- (d) Semantic Attention Map ---
-            if isinstance(maps, dict) and 'sem' in maps:
-                sem_raw = maps['sem']
-            elif isinstance(maps, (list, tuple)) and len(maps) > 1:
-                sem_raw = maps[1]
-            else:
-                sem_raw = torch.zeros_like(torch.tensor(score_map))
+            inv_normalize = transforms.Normalize(
+                mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225],
+                std=[1/0.229, 1/0.224, 1/0.225]
+            )
 
-            if isinstance(sem_raw, torch.Tensor):
-                 # Ensure 4D [B, C, H, W] for interpolate
-                 if sem_raw.dim() == 3: sem_raw = sem_raw.unsqueeze(0)
-                 if sem_raw.dim() == 2: sem_raw = sem_raw.unsqueeze(0).unsqueeze(0)
+            saved_count = 0 
 
-                 sem_vis = F.interpolate(sem_raw, size=image.shape[2:], mode='bilinear', align_corners=False)
-                 sem_vis = sem_vis.cpu().squeeze() # [C, H, W] or [H, W]
-                 
-                 # Only average if channels exist (Dim=3). If already 2D (Dim=2), do NOT average.
-                 if sem_vis.dim() == 3:
-                     if sem_vis.shape[0] == 1:
-                         sem_vis = sem_vis.squeeze(0)
-                     else:
-                         sem_vis = sem_vis.mean(dim=0)
-                     
-                 sem_vis = sem_vis.numpy()
-            else:
-                sem_vis = sem_raw
+            with torch.no_grad():
+                for i, (image, label, mask, img_path) in enumerate(test_loader):
+                    # [Condition 1] Stop if limit reached
+                    if saved_count >= MAX_IMAGES:
+                        break
+                    
+                    # [Condition 2] Skip Normal images (Label 0 = Good, 1 = Defect)
+                    if label.item() == 0:
+                        continue
+                    
+                    filename = os.path.basename(img_path[0])
+                    image = image.to(device)
+                    
+                    # Forward Pass
+                    features, maps = model(image) 
+                    
+                    # Anomaly Scoring
+                    B, C, H, W = features.shape
+                    features_flat = features.view(C, -1).permute(1, 0)
+                    dists = torch.cdist(features_flat, memory_bank, p=2) 
+                    min_dist, _ = torch.min(dists, dim=1)
+                    
+                    # Process Score Map
+                    score_map = min_dist.view(H, W).unsqueeze(0).unsqueeze(0)
+                    score_map = F.interpolate(score_map, size=image.shape[2:], mode='bilinear', align_corners=False)
+                    score_map = score_map.squeeze().cpu().numpy()
+                    score_map = gaussian_filter(score_map, sigma=4.0)
+                    
+                    # Visualization Prep
+                    img_vis = inv_normalize(image.squeeze().cpu()).permute(1, 2, 0).numpy()
+                    img_vis = np.clip(img_vis, 0, 1)
+                    gt_vis = mask.squeeze().cpu().numpy()
+                    
+                    # Frequency Map Logic
+                    if isinstance(maps, dict) and 'freq' in maps: freq_raw = maps['freq']
+                    elif isinstance(maps, (list, tuple)) and len(maps) > 0: freq_raw = maps[0]
+                    else: freq_raw = torch.zeros_like(torch.tensor(score_map))
+                    
+                    if isinstance(freq_raw, torch.Tensor):
+                         if freq_raw.dim() == 3: freq_raw = freq_raw.unsqueeze(0)
+                         if freq_raw.dim() == 2: freq_raw = freq_raw.unsqueeze(0).unsqueeze(0)
+                         freq_vis = F.interpolate(freq_raw, size=image.shape[2:], mode='bilinear', align_corners=False)
+                         freq_vis = freq_vis.cpu().squeeze()
+                         if freq_vis.dim() == 3: freq_vis = freq_vis.mean(dim=0) if freq_vis.shape[0] > 1 else freq_vis.squeeze(0)
+                         freq_vis = freq_vis.numpy()
+                    else: freq_vis = freq_raw
 
-            # Normalize maps for plotting
-            score_vis = normalize_map(score_map)
-            freq_vis = normalize_map(freq_vis)
-            sem_vis = normalize_map(sem_vis)
+                    # Semantic Map Logic
+                    if isinstance(maps, dict) and 'sem' in maps: sem_raw = maps['sem']
+                    elif isinstance(maps, (list, tuple)) and len(maps) > 1: sem_raw = maps[1]
+                    else: sem_raw = torch.zeros_like(torch.tensor(score_map))
 
-            # ---------------------------------------------------------
-            # Plotting: 6 Columns
-            # ---------------------------------------------------------
-            fig, axes = plt.subplots(1, 6, figsize=(24, 4))
-            
-            # (a) Input
-            axes[0].imshow(img_vis)
-            axes[0].set_title("(a) Input")
-            axes[0].axis('off')
+                    if isinstance(sem_raw, torch.Tensor):
+                         if sem_raw.dim() == 3: sem_raw = sem_raw.unsqueeze(0)
+                         if sem_raw.dim() == 2: sem_raw = sem_raw.unsqueeze(0).unsqueeze(0)
+                         sem_vis = F.interpolate(sem_raw, size=image.shape[2:], mode='bilinear', align_corners=False)
+                         sem_vis = sem_vis.cpu().squeeze()
+                         if sem_vis.dim() == 3: sem_vis = sem_vis.mean(dim=0) if sem_vis.shape[0] > 1 else sem_vis.squeeze(0)
+                         sem_vis = sem_vis.numpy()
+                    else: sem_vis = sem_raw
 
-            # (b) GT
-            axes[1].imshow(gt_vis, cmap='gray')
-            axes[1].set_title("(b) GT")
-            axes[1].axis('off')
+                    # Normalize & Plot
+                    score_vis = normalize_map(score_map)
+                    freq_vis = normalize_map(freq_vis)
+                    sem_vis = normalize_map(sem_vis)
 
-            # (c) Frequency Map (Gray/Structural)
-            axes[2].imshow(freq_vis, cmap='gray')
-            axes[2].set_title("(c) Frequency Map")
-            axes[2].axis('off')
+                    fig, axes = plt.subplots(1, 6, figsize=(24, 4))
+                    axes[0].imshow(img_vis); axes[0].set_title("(a) Input"); axes[0].axis('off')
+                    axes[1].imshow(gt_vis, cmap='gray'); axes[1].set_title("(b) GT"); axes[1].axis('off')
+                    axes[2].imshow(freq_vis, cmap='gray'); axes[2].set_title("(c) Frequency Map"); axes[2].axis('off')
+                    axes[3].imshow(sem_vis, cmap='magma'); axes[3].set_title("(d) Semantic Map"); axes[3].axis('off')
+                    axes[4].imshow(score_vis, cmap='jet'); axes[4].set_title("(e) Anomaly Score"); axes[4].axis('off')
+                    
+                    axes[5].imshow(img_vis)
+                    axes[5].imshow(score_vis, cmap='jet', alpha=0.5)
+                    axes[5].set_title("(f) Result"); axes[5].axis('off')
 
-            # (d) Semantic Map (Magma/Energy)
-            axes[3].imshow(sem_vis, cmap='magma')
-            axes[3].set_title("(d) Semantic Map")
-            axes[3].axis('off')
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(save_dir, filename))
+                    plt.close()
+                    
+                    saved_count += 1 # Increment counter
 
-            # (e) Anomaly Score Map (Jet Heatmap)
-            axes[4].imshow(score_vis, cmap='jet')
-            axes[4].set_title("(e) Anomaly Score")
-            axes[4].axis('off')
+            print(f"   Saved {saved_count} defect samples to: {save_dir}")
 
-            # (f) Localization Result (Overlay)
-            axes[5].imshow(img_vis)
-            axes[5].imshow(score_vis, cmap='jet', alpha=0.5) # Overlay
-            axes[5].set_title("(f) Result")
-            axes[5].axis('off')
-
-            plt.tight_layout()
-            plt.savefig(os.path.join(save_dir, filename))
-            plt.close()
-
-    print(f"Visualization Complete! Results saved to: {save_dir}")
+    print("\n[Done] All visualization tasks complete.")
 
 if __name__ == "__main__":
     test_inference()
