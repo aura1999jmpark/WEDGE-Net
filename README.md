@@ -111,6 +111,10 @@ python test.py
 ```
 > **Results:** Output images are saved in `[SAVE_DIR]/[RATIO]/results/[CATEGORY]/`. These figures highlight how the **Proposed Baseline** captures high-frequency structures and semantic context.
 ) will be generated, documenting the performance improvements.
+> **⚠️ Note:**
+    > For visualization, please **set a specific `SAMPLING_RATIO`** (e.g., `0.01`, `0.1`, `1.0`) in `config.py`.
+    > * Unlike training, this script visualizes **one specific model setting** at a time to avoid excessive file generation.
+    > * If `CATEGORY = 'all'`, it will generate results for all categories with that specific ratio.
 
 ### 4. Performance
 
