@@ -22,12 +22,28 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD  = [0.229, 0.224, 0.225]
 
-# WEDGE-Net Path (Fixed to 10% setting)
+# [Fix] Determine Path Suffix based on Config Ratio
+target_ratio_str = str(config.SAMPLING_RATIO)
+
+if '0.01' in target_ratio_str:
+    ratio_suffix = "1pct"
+elif '0.1' in target_ratio_str:
+    ratio_suffix = "10pct"
+elif '1.0' in target_ratio_str or '1' == target_ratio_str:
+    ratio_suffix = "100pct"
+else:
+    # Fallback default
+    ratio_suffix = "10pct"
+    print(f"⚠️ Warning: Config ratio '{config.SAMPLING_RATIO}' not recognized. Defaulting to '10pct'.")
+
+print(f"🎯 Config Ratio: {config.SAMPLING_RATIO} -> Target Folder: {ratio_suffix}")
+# WEDGE-Net Path (Dynamic)
 PATH_WEDGE = os.path.join(
     config.OurModel_DIR, 
-    "10pct", 
-    f"model_data_{CATEGORY}_10pct.pt"
+    ratio_suffix, 
+    f"model_data_{CATEGORY}_{ratio_suffix}.pt"
 )
+
 
 # PatchCore Path (Handle flexibly)
 PATH_PC = getattr(config, 'CompareModel_DIR', "patch_core_pt") + f"/model_data_{CATEGORY}.pt"
