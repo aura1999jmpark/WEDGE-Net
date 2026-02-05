@@ -125,11 +125,14 @@ Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
 | **WEDGE-Net (Ours)** | **10% (Proposed)** | **265** | **7.1x** |
 | WEDGE-Net (Ours) | 1% | 706 | 19.1x |
 **How to run:**
-1. Set the target ratio in `config.py` (e.g., `SAMPLING_RATIO = 0.01`).
+1. Set `SAMPLING_RATIO` in `config.py` to match the **trained checkpoints (.pt files)** you currently have.
+   * Example: `SAMPLING_RATIO = 0.01` (Benchmarks specific 1% models)
+   * Example: `SAMPLING_RATIO = 'all'` (Benchmarks **all trained models** found in `SAVE_DIR`)
 2. Run the benchmark script:
    ```bash
    python benchmark_fps.py
    ```
+> -**Output:** Results are saved to WEDGE-Net/benchmark_fps_results_[ratio].csv.
 > **Note:**
 > * **FPS** values are averaged across all 15 MVTec AD categories.
 > * The **1% setting** demonstrates the model's capability for extreme efficiency, reaching **706.2 FPS**, which is approx. 19x faster than the baseline.
