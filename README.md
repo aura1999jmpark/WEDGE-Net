@@ -124,7 +124,12 @@ Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
 | PatchCore (Ref) | 100% | 99.2% | 37 | 1.0x |
 | **WEDGE-Net (Ours)** | 10% | 99.1% | **265** | **7.1x** |
 | **WEDGE-Net (Ours)** | **1%** | **98.5%** | **687** | **18.4x** |
-
+**How to run:**
+1. Set the target ratio in `config.py` (e.g., `SAMPLING_RATIO = 0.01`).
+2. Run the benchmark script:
+   ```bash
+   python benchmark_fps.py
+   ```
 > **Note:**
 > * **FPS** values are averaged across all 15 MVTec AD categories (batch size = 1).
 > * **1% Coreset** setting delivers **680+ FPS**, enabling ultra-low latency processing on edge devices.
