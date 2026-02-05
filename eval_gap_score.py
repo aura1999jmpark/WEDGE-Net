@@ -1,203 +1,198 @@
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from scipy.ndimage import gaussian_filter
+from tqdm import tqdm
 import os
+import random
 import numpy as np
-import csv
-import sys
+
+# Ensure correct imports
+# Note: Ensure your model file is named 'model.py' or update this import accordingly.
 from model import WEDGE_Net
 from dataset import MVTecDataset
-import config  # Import updated config
+import config
 
-# === [Settings] ===
-DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Full MVTec AD category list
+ALL_CATEGORIES = [
+    'bottle', 'cable', 'capsule', 'carpet', 'grid',
+    'hazelnut', 'leather', 'metal_nut', 'pill', 'screw',
+    'tile', 'toothbrush', 'transistor', 'wood', 'zipper'
+]
 
-# 1. Load Paths from Config
-DIR_OFF = config.SemanticOFF_DIR  # Baseline (Semantic OFF)
-DIR_ON  = config.SemanticON_DIR   # Proposed (Semantic ON)
-
-# Safety Check
-if not DIR_OFF or DIR_OFF == "":
-    print("\n" + "!"*60)
-    print(" [Error] 'SemanticOFF_DIR' is empty in config.py!")
-    sys.exit(1)
-
-# CSV Output Path
-CSV_NAME = config.GAP_RESULT_CSV
-CSV_PATH = os.path.join(DIR_ON, CSV_NAME)
-
-# 2. Category Definition
-TEXTURE_CLASSES = sorted(['carpet', 'grid', 'leather', 'tile', 'wood'])
-OBJECT_CLASSES = sorted([
-    'bottle', 'cable', 'capsule', 'hazelnut', 'metal_nut', 
-    'pill', 'screw', 'toothbrush', 'transistor', 'zipper'
-])
-ALL_CATEGORIES = TEXTURE_CLASSES + OBJECT_CLASSES
-
-# Determine Target Ratio based on Config
-target_ratio_str = str(config.SAMPLING_RATIO)
-if '0.01' in target_ratio_str: TARGET_RATIO = "1pct"
-elif '0.1' in target_ratio_str: TARGET_RATIO = "10pct"
-elif '1.0' in target_ratio_str or '1' == target_ratio_str: TARGET_RATIO = "100pct"
-else: TARGET_RATIO = "10pct"
-
-print(f"🎯 Target Ratio Set: {TARGET_RATIO} (from config: {config.SAMPLING_RATIO})")
-
-# Feature Extractor for Semantic OFF Model (Force 1536 dim)
-def extract_features_1536(model, x):
-    features = []
-    def hook(module, input, output): features.append(output)
+def k_center_greedy(matrix, sampling_ratio, device):
+    """
+    Selects a subset of features using the K-Center Greedy algorithm (Coreset).
+    Includes a progress bar for visualization.
+    """
+    num_samples = matrix.shape[0]
+    num_to_select = int(num_samples * sampling_ratio)
     
-    if hasattr(model, 'encoder'):
-        h1 = model.encoder.layer2.register_forward_hook(hook)
-        h2 = model.encoder.layer3.register_forward_hook(hook)
-    else:
-        h1 = model.layer2.register_forward_hook(hook)
-        h2 = model.layer3.register_forward_hook(hook)
+    # If sampling ratio is effectively 1.0, return all indices
+    if num_to_select >= num_samples:
+        return torch.arange(num_samples)
+
+    matrix = matrix.to(device).float()
+    selected_indices = [0]
+    
+    # Initial distance calculation
+    dists = torch.cdist(matrix[0].unsqueeze(0), matrix, p=2).squeeze(0)
+    
+    # Iteratively select the furthest point (Greedy selection)
+    # Wrapped with tqdm to show progress
+    for _ in tqdm(range(num_to_select - 1), desc=f"Sampling {int(sampling_ratio*100)}%"):
+        next_idx = torch.argmax(dists).item()
+        selected_indices.append(next_idx)
         
-    _ = model(x)
-    h1.remove(); h2.remove()
-    f1 = F.avg_pool2d(features[0], 3, 1, 1)
-    f2 = F.avg_pool2d(features[1], 3, 1, 1)
-    f2 = F.interpolate(f2, size=f1.shape[2:], mode='bilinear', align_corners=False)
-    return torch.cat([f1, f2], dim=1)
+        new_dists = torch.cdist(matrix[next_idx].unsqueeze(0), matrix, p=2).squeeze(0)
+        dists = torch.minimum(dists, new_dists)
+        
+    return torch.tensor(selected_indices).cpu()
 
-def get_model_path(base_dir, category):
-    """Smart Path Finder for .pt files"""
-    path1 = os.path.join(base_dir, TARGET_RATIO, f"model_data_{category}_{TARGET_RATIO}.pt")
-    if os.path.exists(path1): return path1
-    path2 = os.path.join(base_dir, f"model_data_{category}_{TARGET_RATIO}.pt")
-    if os.path.exists(path2): return path2
-    path3 = os.path.join(base_dir, f"model_data_{category}.pt")
-    if os.path.exists(path3): return path3
-    return None
+def get_ratio_name(ratio):
+    """
+    Helper to convert float ratio to string suffix/folder name.
+    1.0 -> '100pct', 0.1 -> '10pct', 0.01 -> '1pct'
+    """
+    if ratio == 1.0: return "100pct"
+    elif ratio == 0.1: return "10pct"
+    elif ratio == 0.01: return "1pct"
+    else: return f"{int(ratio*100)}pct"
 
-def calculate_gap(category, mode):
-    # 1. Setup Model & Path
-    if mode == 'OFF':
-        model = WEDGE_Net(use_semantic=False).to(DEVICE)
-        base_dir = DIR_OFF
+def train_category(category, device):
+    """
+    Constructs the memory bank for a specific category.
+    Handles 'all' sampling ratios efficiently by extracting features once.
+    """
+    
+    # 1. Determine Sampling Ratios to Process
+    # [Modified] Logic updated to ALWAYS include 1.0 (100pct) regardless of config setting.
+    raw_ratio = getattr(config, 'SAMPLING_RATIO', 1.0)
+    
+    if raw_ratio == 'all':
+        target_ratios = [1.0, 0.1, 0.01]
+        print(f"\n[Training] Category: {category} | Mode: Process ALL ratios (100%, 10%, 1%)")
     else:
-        model = WEDGE_Net(use_semantic=True).to(DEVICE)
-        base_dir = DIR_ON
+        requested_ratio = float(raw_ratio)
+        if requested_ratio == 1.0:
+            target_ratios = [1.0]
+        else:
+            # If user requests 0.1, we process [1.0, 0.1] to ensure baseline exists
+            # Sorted descending to ensure 100pct (1.0) is processed/saved first
+            target_ratios = sorted(list(set([1.0, requested_ratio])), reverse=True)
+            
+        print(f"\n[Training] Category: {category} | Mode: 100pct + Target ratio ({requested_ratio})")
+
+    # 2. Check if all target files already exist (Skip Logic)
+    base_save_dir = getattr(config, 'SAVE_DIR', 'WEDGE-Net')
+    all_exist = True
+    for r in target_ratios:
+        name = get_ratio_name(r)
+        path = os.path.join(base_save_dir, name, f"model_data_{category}_{name}.pt")
+        if not os.path.exists(path):
+            all_exist = False
+            break
     
-    pt_path = get_model_path(base_dir, category)
-    if pt_path is None:
-        # Cannot calculate gap if model is missing
-        return None
+    if all_exist:
+        print(f"[Skip] All target files for '{category}' already exist.")
+        return
 
+    # 3. Model & Data Initialization
+    train_dataset = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='train')
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=config.BATCH_SIZE, 
+        shuffle=False, 
+        num_workers=config.NUM_WORKERS
+    )
     
-    print(f"    [{mode}] Found at: {pt_path}")
-
-    # 2. Load Checkpoint
-    try:
-        checkpoint = torch.load(pt_path, map_location=DEVICE)
-        bank = checkpoint['memory_bank'] if isinstance(checkpoint, dict) else checkpoint
-        model.eval()
-    except Exception as e:
-        print(f"Error loading {pt_path}: {e}")
-        return None
-
-    ds = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
-    loader = DataLoader(ds, batch_size=1, shuffle=False)
-
-    normal_scores = []
-    defect_scores = []
-
+    model = WEDGE_Net(use_semantic=config.USE_SEMANTIC).to(device)
+    model.eval() 
+    
+    # 4. Feature Extraction (Performed ONCE)
+    features_list = []
+    print(f"[Info] Extracting features from {len(train_dataset)} normal samples...")
+    
     with torch.no_grad():
-        for img, label, _, _ in loader:
-            img = img.to(DEVICE)
+        for image, _, _, _ in tqdm(train_loader, desc=f"Extracting {category}"):
+            image = image.to(device)
+            features, _ = model(image) 
             
-            # Feature Extraction
-            if mode == 'OFF':
-                features = extract_features_1536(model, img)
-            else:
-                features, _ = model(img)
+            # Flatten features: (B, C, H, W) -> (B*H*W, C)
+            B, C, H, W = features.shape
+            features_flat = features.view(B, C, -1).permute(0, 2, 1).reshape(-1, C)
+            features_list.append(features_flat.cpu())
             
-            # Anomaly Scoring
-            b, c, h, w = features.shape
-            features_flat = features.view(c, -1).permute(1, 0)
-            
-            dists = torch.cdist(features_flat, bank)
-            s_map = dists.min(dim=1)[0].reshape(h, w).cpu().numpy()
-            s_map = gaussian_filter(s_map, sigma=4)
-            score = s_map.max()
+    full_features = torch.cat(features_list, dim=0)
+    
+    # Compute Statistics once
+    feature_mean = full_features.mean(dim=0)
+    feature_std = full_features.std(dim=0)
+    
+    # 5. Iterative Sampling and Saving
+    sampling_method = getattr(config, 'SAMPLING_METHOD', 'coreset')
 
-            if label.item() == 0:
-                normal_scores.append(score)
-            else:
-                defect_scores.append(score)
-
-    if not normal_scores or not defect_scores:
-        return 0.0
+    for ratio in target_ratios:
+        ratio_name = get_ratio_name(ratio)
         
-    # Gap Calculation
-    return np.mean(defect_scores) - np.mean(normal_scores)
+        # Define Save Path: checkpoints/10pct/model_data_bottle_10pct.pt
+        save_subdir = os.path.join(base_save_dir, ratio_name)
+        os.makedirs(save_subdir, exist_ok=True)
+        save_path = os.path.join(save_subdir, f"model_data_{category}_{ratio_name}.pt")
+        
+        if os.path.exists(save_path):
+            print(f"  -> [Skip] {ratio_name} already exists.")
+            continue
+
+        # Perform Sampling
+        if ratio >= 1.0:
+            memory_bank = full_features
+            print(f"  -> [Save] Saving Full Memory ({ratio_name})...")
+        else:
+            print(f"  -> [Sampling] Generating {ratio_name} coreset...")
+            if sampling_method == 'coreset':
+                # k_center_greedy includes a progress bar
+                indices = k_center_greedy(full_features, ratio, device)
+                memory_bank = full_features[indices]
+            elif sampling_method == 'random':
+                num_samples = full_features.shape[0]
+                target_size = int(num_samples * ratio)
+                indices = torch.randperm(num_samples)[:target_size]
+                memory_bank = full_features[indices]
+            else:
+                raise ValueError(f"Unknown method: {sampling_method}")
+
+        # Save
+        torch.save({
+            'memory_bank': memory_bank,
+            'feature_mean': feature_mean,
+            'feature_std': feature_std
+        }, save_path)
+        
+        print(f"      Saved to: {save_path} (Size: {memory_bank.shape})")
+
+    print(f"[Done] Category {category} processing complete.\n")
 
 def main():
-    print(f" [Discussion] Score Gap Analysis")
-    print(f" - Target Ratio  : {TARGET_RATIO}")
-    print(f" - Semantic OFF Dir: {DIR_OFF}")
-    print(f" - Semantic ON  Dir: {DIR_ON}")
-    print("-" * 60)
+    # Setup Device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {device}")
+
+    # Determine target categories
+    raw_cat = getattr(config, 'CATEGORY', 'all')
     
-    results = []
-    tex_gaps_off, tex_gaps_on = [], []
-    obj_gaps_off, obj_gaps_on = [], []
+    if raw_cat.lower() == 'all':
+        print("Mode: Processing ALL categories.")
+        target_categories = ALL_CATEGORIES
+    elif ',' in raw_cat:
+        target_categories = [cat.strip() for cat in raw_cat.split(',')]
+        print(f"Mode: Processing specific list -> {target_categories}")
+    else:
+        print(f"Mode: Single category processing ({raw_cat}).")
+        target_categories = [raw_cat]
 
-    for cat in ALL_CATEGORIES:
-        group_type = "Texture" if cat in TEXTURE_CLASSES else "Object"
-        
-        
-        print(f" >> [Processing] Category: {cat.upper()} ({group_type})")
-        
-        gap_off = calculate_gap(cat, 'OFF')
-        gap_on = calculate_gap(cat, 'ON')
-        
-        if gap_off is not None and gap_on is not None:
-            if abs(gap_off) < 1e-9: imp = 0.0
-            else: imp = ((gap_on - gap_off) / abs(gap_off)) * 100
-            
-            results.append({
-                'Category': cat, 'Type': group_type,
-                'Gap_OFF': round(gap_off, 5), 'Gap_ON': round(gap_on, 5),
-                'Improvement(%)': round(imp, 2)
-            })
-            
-            if group_type == "Texture":
-                tex_gaps_off.append(gap_off); tex_gaps_on.append(gap_on)
-            else:
-                obj_gaps_off.append(gap_off); obj_gaps_on.append(gap_on)
-        else:
-            print(f"    (Skipped: Model not found)")
-
-    print("\nAnalysis Complete.")
-
-    # Averages
-    avg_rows = []
-    if tex_gaps_off:
-        m_off, m_on = np.mean(tex_gaps_off), np.mean(tex_gaps_on)
-        m_imp = ((m_on - m_off) / abs(m_off)) * 100
-        avg_rows.append({'Category': 'AVG (Texture)', 'Type': 'Texture', 'Gap_OFF': round(m_off, 5), 'Gap_ON': round(m_on, 5), 'Improvement(%)': round(m_imp, 2)})
-        
-    if obj_gaps_off:
-        m_off, m_on = np.mean(obj_gaps_off), np.mean(obj_gaps_on)
-        m_imp = ((m_on - m_off) / abs(m_off)) * 100
-        avg_rows.append({'Category': 'AVG (Object)', 'Type': 'Object', 'Gap_OFF': round(m_off, 5), 'Gap_ON': round(m_on, 5), 'Improvement(%)': round(m_imp, 2)})
-
-    # Save CSV
-    if not os.path.exists(DIR_ON): os.makedirs(DIR_ON)
-    with open(CSV_PATH, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['Category', 'Type', 'Gap_OFF', 'Gap_ON', 'Improvement(%)'])
-        writer.writeheader()
-        writer.writerows(results)
-        writer.writerow({})
-        writer.writerows(avg_rows)
-
-    print(f"Saved to: {CSV_PATH}")
-    for row in avg_rows:
-        print(f" >> {row['Category']}: {row['Gap_OFF']} -> {row['Gap_ON']} ({row['Improvement(%)']}%)")
+    # Run Loop
+    for cat in target_categories:
+        train_category(cat, device)
 
 if __name__ == "__main__":
     main()
