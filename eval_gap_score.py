@@ -17,13 +17,10 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DIR_OFF = config.SemanticOFF_DIR  # Baseline (Semantic OFF)
 DIR_ON  = config.SemanticON_DIR   # Proposed (Semantic ON)
 
-# Safety Check: Ensure the user set the OFF directory
+# Safety Check
 if not DIR_OFF or DIR_OFF == "":
     print("\n" + "!"*60)
     print(" [Error] 'SemanticOFF_DIR' is empty in config.py!")
-    print(" Please specify the path to the model trained with 'use_semantic=False'.")
-    print(" It is required to reproduce 'Anomaly Score Margin' in the Discussion section")
-    print("!"*60 + "\n")
     sys.exit(1)
 
 # CSV Output Path
@@ -38,16 +35,20 @@ OBJECT_CLASSES = sorted([
 ])
 ALL_CATEGORIES = TEXTURE_CLASSES + OBJECT_CLASSES
 
-# Target Ratio (Must match the trained models)
-TARGET_RATIO = "10pct"
+# Determine Target Ratio based on Config
+target_ratio_str = str(config.SAMPLING_RATIO)
+if '0.01' in target_ratio_str: TARGET_RATIO = "1pct"
+elif '0.1' in target_ratio_str: TARGET_RATIO = "10pct"
+elif '1.0' in target_ratio_str or '1' == target_ratio_str: TARGET_RATIO = "100pct"
+else: TARGET_RATIO = "10pct"
+
+print(f"🎯 Target Ratio Set: {TARGET_RATIO} (from config: {config.SAMPLING_RATIO})")
 
 # Feature Extractor for Semantic OFF Model (Force 1536 dim)
 def extract_features_1536(model, x):
     features = []
-    def hook(module, input, output):
-        features.append(output)
-        
-    # Hook registration based on architecture
+    def hook(module, input, output): features.append(output)
+    
     if hasattr(model, 'encoder'):
         h1 = model.encoder.layer2.register_forward_hook(hook)
         h2 = model.encoder.layer3.register_forward_hook(hook)
@@ -57,28 +58,19 @@ def extract_features_1536(model, x):
         
     _ = model(x)
     h1.remove(); h2.remove()
-    
-    # Standard Preprocessing
     f1 = F.avg_pool2d(features[0], 3, 1, 1)
     f2 = F.avg_pool2d(features[1], 3, 1, 1)
     f2 = F.interpolate(f2, size=f1.shape[2:], mode='bilinear', align_corners=False)
-    
     return torch.cat([f1, f2], dim=1)
 
 def get_model_path(base_dir, category):
     """Smart Path Finder for .pt files"""
-    # 1. Sub-directory (e.g., base/10pct/model_bottle_10pct.pt)
     path1 = os.path.join(base_dir, TARGET_RATIO, f"model_data_{category}_{TARGET_RATIO}.pt")
     if os.path.exists(path1): return path1
-    
-    # 2. Root (e.g., base/model_bottle_10pct.pt)
     path2 = os.path.join(base_dir, f"model_data_{category}_{TARGET_RATIO}.pt")
     if os.path.exists(path2): return path2
-
-    # 3. Legacy (e.g., base/model_bottle.pt)
     path3 = os.path.join(base_dir, f"model_data_{category}.pt")
     if os.path.exists(path3): return path3
-    
     return None
 
 def calculate_gap(category, mode):
@@ -92,7 +84,11 @@ def calculate_gap(category, mode):
     
     pt_path = get_model_path(base_dir, category)
     if pt_path is None:
+        # Cannot calculate gap if model is missing
         return None
+
+    
+    print(f"    [{mode}] Found at: {pt_path}")
 
     # 2. Load Checkpoint
     try:
@@ -103,7 +99,6 @@ def calculate_gap(category, mode):
         print(f"Error loading {pt_path}: {e}")
         return None
 
-    # 3. Load Data (Test Set)
     ds = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
     loader = DataLoader(ds, batch_size=1, shuffle=False)
 
@@ -141,7 +136,8 @@ def calculate_gap(category, mode):
     return np.mean(defect_scores) - np.mean(normal_scores)
 
 def main():
-    print(f" [Discusstion] Score Gap Analysis")
+    print(f" [Discussion] Score Gap Analysis")
+    print(f" - Target Ratio  : {TARGET_RATIO}")
     print(f" - Semantic OFF Dir: {DIR_OFF}")
     print(f" - Semantic ON  Dir: {DIR_ON}")
     print("-" * 60)
@@ -152,7 +148,9 @@ def main():
 
     for cat in ALL_CATEGORIES:
         group_type = "Texture" if cat in TEXTURE_CLASSES else "Object"
-        print(f"Processing {cat} ({group_type})...", end="\r")
+        
+        
+        print(f" >> [Processing] Category: {cat.upper()} ({group_type})")
         
         gap_off = calculate_gap(cat, 'OFF')
         gap_on = calculate_gap(cat, 'ON')
@@ -172,7 +170,7 @@ def main():
             else:
                 obj_gaps_off.append(gap_off); obj_gaps_on.append(gap_on)
         else:
-            print(f"\n Skipped {cat}")
+            print(f"    (Skipped: Model not found)")
 
     print("\nAnalysis Complete.")
 
