@@ -117,7 +117,7 @@ python test.py
 We **propose the 10% memory bank setting** as the optimal configuration to ensure stability and robust detection performance while maintaining high-speed inference. Although the 1% setting achieves extreme speeds (over 700 FPS), the 10% setting offers the best balance for industrial applications.
 
 ### ⚡ Inference Speed Comparison
-Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 3090.
+Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
 
 | Model | Memory Bank | FPS (Inference) | Speedup |
 | :--- | :---: | :---: | :---: |
