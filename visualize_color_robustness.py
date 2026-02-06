@@ -44,7 +44,6 @@ PATH_WEDGE = os.path.join(
     f"model_data_{CATEGORY}_{ratio_suffix}.pt"
 )
 
-
 # PatchCore Path (Handle flexibly)
 PATH_PC = getattr(config, 'CompareModel_DIR', "patch_core_pt") + f"/model_data_{CATEGORY}.pt"
 
@@ -253,11 +252,28 @@ def run_color_experiment():
         clean_disp = tensor_to_img_numpy(img_raw.squeeze(0))
         distorted_disp = tensor_to_img_numpy(distorted_raw.squeeze(0))
 
+        # [Fix] Smart Visualization Scaling
+        # 1. Determine the baseline (Blue point).
+        # We use the actual minimum value of the map so the lowest score is always Blue.
         v_min = raw_wd.min()
-        v_max = raw_wd.max()
+        current_max = raw_wd.max()
+        
         if HAS_PC:
             v_min = min(raw_pc.min(), v_min)
-            v_max = max(raw_pc.max(), v_max)
+            current_max = max(raw_pc.max(), current_max)
+        
+        # 2. Determine the ceiling (Red point).
+        v_max = current_max
+
+        # 3. [Crucial] Apply 'Minimum Dynamic Range'
+        # Instead of fixing v_max, we ensure the GAP between min and max is large enough.
+        # If max - min is too small (e.g., 0.01 noise), we artificially stretch v_max.
+        # This keeps the image Blue when there are no significant anomalies.
+        actual_gap = v_max - v_min
+        SAFETY_GAP = 0.5  # If the variation is smaller than this, it's considered noise.
+        
+        if actual_gap < SAFETY_GAP:
+            v_max = v_min + SAFETY_GAP
 
         # (a) Original
         ax = axes[i, 0]
