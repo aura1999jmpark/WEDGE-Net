@@ -21,28 +21,12 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD  = [0.229, 0.224, 0.225]
 
-# [Fix] Determine Path Suffix based on Config Ratio
-target_ratio_str = str(config.SAMPLING_RATIO)
-
-if '0.01' in target_ratio_str:
-    ratio_suffix = "1pct"
-elif '0.1' in target_ratio_str:
-    ratio_suffix = "10pct"
-elif '1.0' in target_ratio_str or '1' == target_ratio_str:
-    ratio_suffix = "100pct"
-else:
-    # Fallback default
-    ratio_suffix = "10pct"
-    print(f"⚠️ Warning: Config ratio '{config.SAMPLING_RATIO}' not recognized. Defaulting to '10pct'.")
-
-print(f"🎯 Config Ratio: {config.SAMPLING_RATIO} -> Target Folder: {ratio_suffix}")
-# WEDGE-Net Path (Dynamic)
+# Path Configuration
 PATH_WEDGE = os.path.join(
     config.OurModel_DIR, 
-    ratio_suffix, 
-    f"model_data_{CATEGORY}_{ratio_suffix}.pt"
+    "10pct", 
+    f"model_data_{CATEGORY}_10pct.pt"
 )
-
 
 # PatchCore path might vary based on config (handled flexibly)
 PATH_PC = getattr(config, 'CompareModel_DIR', "patch_core_pt") + f"/model_data_{CATEGORY}.pt"
@@ -239,12 +223,28 @@ def run_noise_visualization():
         clean_disp = tensor_to_img_numpy(img_raw.squeeze(0)) 
         noisy_disp = tensor_to_img_numpy(noisy_img_raw.squeeze(0))
 
-        # Unify Colorbar Scale (Per row)
+        # [Fix] Smart Visualization Scaling
+        # 1. Determine the baseline (Blue point).
+        # We use the actual minimum value of the map so the lowest score is always Blue.
         v_min = raw_wd.min()
-        v_max = raw_wd.max()
+        current_max = raw_wd.max()
+        
         if HAS_PC:
             v_min = min(raw_pc.min(), v_min)
-            v_max = max(raw_pc.max(), v_max)
+            current_max = max(raw_pc.max(), current_max)
+        
+        # 2. Determine the ceiling (Red point).
+        v_max = current_max
+
+        # 3. [Crucial] Apply 'Minimum Dynamic Range'
+        # Instead of fixing v_max, we ensure the GAP between min and max is large enough.
+        # If max - min is too small (e.g., 0.01 noise), we artificially stretch v_max.
+        # This keeps the image Blue when there are no significant anomalies.
+        actual_gap = v_max - v_min
+        SAFETY_GAP = 0.5  # If the variation is smaller than this, it's considered noise.
+        
+        if actual_gap < SAFETY_GAP:
+            v_max = v_min + SAFETY_GAP
 
         # --- Plotting ---
         # Col 0: Clean Original
