@@ -14,8 +14,8 @@ import config
 # ==============================================================================
 BASE_DIR = config.SAVE_DIR
 CATEGORY = config.CATEGORY
-# Intensity of experiment: 0 (Original) ~ 2.0 (Severe)
-INTENSITIES = [0.5, 1.0, 1.5, 2.0] 
+# Intensity of experiment: 0 (Original) ~ 3.0 (Severe)
+INTENSITIES = [0.5, 1.0, 2.0, 3.0] 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # ImageNet Mean/Std
@@ -23,20 +23,23 @@ IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD  = [0.229, 0.224, 0.225]
 
 # [Fix] Determine Path Suffix based on Config Ratio
-target_ratio_str = str(config.SAMPLING_RATIO)
+raw_ratio = str(getattr(config, 'SAMPLING_RATIO', 'all')).lower()
 
-if '0.01' in target_ratio_str:
-    ratio_suffix = "1pct"
-elif '0.1' in target_ratio_str:
-    ratio_suffix = "10pct"
-elif '1.0' in target_ratio_str or '1' == target_ratio_str:
-    ratio_suffix = "100pct"
+if raw_ratio == 'all':
+    print(" [Info] 'all' ratio selected. Defaulting to 0.1% (0_1pct) for qualitative figure.")
+    ratio_suffix = "0_1pct"
 else:
-    # Fallback default
-    ratio_suffix = "10pct"
-    print(f"⚠️ Warning: Config ratio '{config.SAMPLING_RATIO}' not recognized. Defaulting to '10pct'.")
+    try:
+        val = float(raw_ratio)
+        if abs(val - 0.001) < 1e-6: ratio_suffix = "0_1pct" # 0.1%
+        elif abs(val - 0.01) < 1e-6: ratio_suffix = "1pct"  # 1%
+        elif abs(val - 0.1) < 1e-6: ratio_suffix = "10pct"  # 10%
+        elif abs(val - 1.0) < 1e-6: ratio_suffix = "100pct" # 100%
+        else: ratio_suffix = "1pct" # Fallback
+    except:
+        ratio_suffix = "1pct"
+print(f"🎯 Config Ratio: {raw_ratio} -> Target Folder: {ratio_suffix}")
 
-print(f"🎯 Config Ratio: {config.SAMPLING_RATIO} -> Target Folder: {ratio_suffix}")
 # WEDGE-Net Path (Dynamic)
 PATH_WEDGE = os.path.join(
     config.OurModel_DIR, 
@@ -44,8 +47,17 @@ PATH_WEDGE = os.path.join(
     f"model_data_{CATEGORY}_{ratio_suffix}.pt"
 )
 
-# PatchCore Path (Handle flexibly)
-PATH_PC = getattr(config, 'CompareModel_DIR', "patch_core_pt") + f"/model_data_{CATEGORY}.pt"
+# PatchCore Path (Compare against 10% Optimized if possible, else default)
+pc_base = getattr(config, 'CompareModel_DIR', "patch_core_pt")
+PATH_PC_CANDIDATES = [
+    os.path.join(pc_base, f"model_data_{CATEGORY}_10pct.pt"),
+    os.path.join(pc_base, f"model_data_{CATEGORY}.pt")
+]
+PATH_PC = PATH_PC_CANDIDATES[1] # Default fallback
+for p in PATH_PC_CANDIDATES:
+    if os.path.exists(p):
+        PATH_PC = p
+        break
 
 # ==============================================================================
 # 2. Utility Classes & Functions
@@ -311,7 +323,17 @@ def run_color_experiment():
                    bbox=dict(facecolor='black', alpha=0.6, edgecolor='none', pad=3))
 
     # Header Titles
-    cols = ['(a) Original', '(b) Color Shifted', '(c) PatchCore (Ref)', '(d) WEDGE-Net (Ours)']
+    wd_label = ratio_suffix.replace('pct', '%').replace('_', '.')
+    pc_label = "10%" if "10pct" in os.path.basename(PATH_PC) else "100%"
+    cols = [
+        '(a) Original', 
+        '(b) Color Shifted', 
+        f'(c) PatchCore ({pc_label})', 
+        f'(d) WEDGE-Net ({wd_label})'
+    ]
+
+    for ax, col in zip(axes[0], cols):
+        ax.set_title(col, fontsize=18, fontweight='bold', pad=10)
     for ax, col in zip(axes[0], cols):
         ax.set_title(col, fontsize=22, fontweight='bold', pad=15)
 
