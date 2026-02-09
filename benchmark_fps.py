@@ -21,7 +21,8 @@ def measure_fps_exact():
     target_suffix = ""
     
     # Convert ratio to suffix string for Folder Search & Filename
-    if str(raw_ratio) == '0.01': target_suffix = "1pct"
+    if str(raw_ratio) == '0.001': target_suffix = "0_1pct"
+    elif str(raw_ratio) == '0.01': target_suffix = "1pct"
     elif str(raw_ratio) == '0.1': target_suffix = "10pct"
     elif str(raw_ratio) == '1.0': target_suffix = "100pct"
     else: target_suffix = "all" # If 'all' or specific number not in list
