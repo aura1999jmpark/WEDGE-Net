@@ -6,293 +6,276 @@ import numpy as np
 from torchvision import models, transforms
 from scipy.ndimage import gaussian_filter
 from model import WEDGE_Net
-from dataset import MVTecDataset
+from dataset import MVTecDataset 
 import config
+import glob
+import sys  
 
 # ==============================================================================
-# 1. Settings & Constants
+# 1. Configuration & Global Settings
 # ==============================================================================
-BASE_DIR = config.SAVE_DIR
-CATEGORY = config.CATEGORY
-NOISE_LEVELS = [10, 20, 30, 40]
+ALL_CATEGORIES = [
+    'bottle', 'cable', 'capsule', 'carpet', 'grid',
+    'hazelnut', 'leather', 'metal_nut', 'pill', 'screw',
+    'tile', 'toothbrush', 'transistor', 'wood', 'zipper'
+]
+
+BASE_DIR = getattr(config, 'SAVE_DIR', 'WEDGE-Net')
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-# ImageNet Mean/Std
+NOISE_LEVELS = [0, 10, 20, 30] 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD  = [0.229, 0.224, 0.225]
 
-# Path Configuration
-PATH_WEDGE = os.path.join(
-    config.OurModel_DIR, 
-    "10pct", 
-    f"model_data_{CATEGORY}_10pct.pt"
-)
+# [Config] Ratio Parsing (Enhanced Message)
+raw_ratio = str(getattr(config, 'SAMPLING_RATIO', '0.01')).lower()
 
-# PatchCore path might vary based on config (handled flexibly)
-PATH_PC = getattr(config, 'CompareModel_DIR', "patch_core_pt") + f"/model_data_{CATEGORY}.pt"
+if raw_ratio == 'all':
+    print("\n" + "-"*60)
+    print(" [Info] Configured SAMPLING_RATIO = 'all'.")
+    print(" To ensure concise visualization (Figure 5), we focus on the Main Proposed Method (1%).")
+    print(" Processing all ratios would generate redundant figures.")
+    print(" -> Defaulting to '1pct' (1%) for this run.")
+    print("-"*60 + "\n")
+    ratio_suffix = "1pct"
+else:
+    try:
+        val = float(raw_ratio)
+        if abs(val - 0.001) < 1e-6: ratio_suffix = "0_1pct"
+        elif abs(val - 0.01) < 1e-6: ratio_suffix = "1pct"
+        elif abs(val - 0.1) < 1e-6: ratio_suffix = "10pct"
+        elif abs(val - 1.0) < 1e-6: ratio_suffix = "100pct"
+        else: ratio_suffix = "1pct"
+    except ValueError:
+        ratio_suffix = "1pct"
+
+print(f"🎯 Target Ratio: {raw_ratio} -> Folder: '{ratio_suffix}'")
 
 # ==============================================================================
-# 2. Utility Classes & Functions
+# 2. Smart File Finder
+# ==============================================================================
+def find_best_model_path(base_dir, category, target_str=None):
+    if not os.path.exists(base_dir): return None
+    all_files = [f for f in os.listdir(base_dir) if f.endswith('.pt')]
+    candidates = [f for f in all_files if category in f]
+    if not candidates: return None
+    if target_str:
+        priority = [f for f in candidates if target_str in f]
+        if priority: return os.path.join(base_dir, priority[0])
+    candidates.sort(key=len)
+    return os.path.join(base_dir, candidates[0])
+
+# ==============================================================================
+# 3. Utility Classes
 # ==============================================================================
 class UnNormalize(object):
-    """Restores normalized tensor to original image (0-1)"""
     def __init__(self, mean, std):
-        self.mean = mean
-        self.std = std
-
+        self.mean, self.std = mean, std
     def __call__(self, tensor):
-        # Add batch dimension if missing
-        if tensor.ndim == 3:
-            tensor = tensor.unsqueeze(0)
-        tensor_copy = tensor.clone()
-        for t, m, s in zip(tensor_copy, self.mean, self.std):
-            t.mul_(s).add_(m)
-        return tensor_copy
+        if tensor.ndim == 3: tensor = tensor.unsqueeze(0)
+        t_copy = tensor.clone()
+        m = torch.tensor(self.mean).view(1, 3, 1, 1).to(tensor.device)
+        s = torch.tensor(self.std).view(1, 3, 1, 1).to(tensor.device)
+        t_copy.mul_(s).add_(m)
+        return t_copy
 
-# Global transformation objects
 unorm = UnNormalize(IMAGENET_MEAN, IMAGENET_STD)
 norm = transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)
 
 def tensor_to_img_numpy(tensor):
-    """Converts (C, H, W) 0-1 tensor to (H, W, C) 0-255 numpy array"""
     img = tensor.permute(1, 2, 0).cpu().numpy()
-    img = (img * 255).astype(np.uint8)
-    return img
+    return (img * 255).astype(np.uint8)
 
 def get_maps(model_pc, bank_pc, model_wd, bank_wd, img_tensor):
-    """
-    Extracts Anomaly Maps for PatchCore and WEDGE-Net.
-    Skips calculation if PatchCore model is None.
-    """
-    # Original image size (e.g., 224, 224)
     H, W = img_tensor.shape[2], img_tensor.shape[3]
     map_pc = None 
 
     # --- PatchCore Inference ---
-    if model_pc is not None and bank_pc is not None:
+    if model_pc and bank_pc is not None:
         try:
             features = []
-            def hook(module, input, output): features.append(output)
+            def hook(m, i, o): features.append(o)
             h1 = model_pc.layer2.register_forward_hook(hook)
             h2 = model_pc.layer3.register_forward_hook(hook)
-            
             _ = model_pc(img_tensor)
-            
             h1.remove(); h2.remove()
             
             f1 = F.avg_pool2d(features[0], 3, 1, 1)
             f2 = F.avg_pool2d(features[1], 3, 1, 1)
             f2 = F.interpolate(f2, size=f1.shape[2:], mode='bilinear', align_corners=False)
+            z = torch.cat([f1, f2], dim=1) 
             
-            z = torch.cat([f1, f2], dim=1)
-            
-            # Get feature map dimensions dynamically
-            _, _, h_pc, w_pc = z.shape 
+            _, _, h_pc, w_pc = z.shape
             embedding = z.permute(0, 2, 3, 1).reshape(-1, z.shape[1])
-            
             dists = torch.cdist(embedding, bank_pc)
             min_dist, _ = dists.min(dim=1)
             
-            # 1. Reshape to feature map size first
             map_pc = min_dist.reshape(h_pc, w_pc).unsqueeze(0).unsqueeze(0)
-            # 2. Upsample to original size (Interpolate)
             map_pc = F.interpolate(map_pc, size=(H, W), mode='bilinear', align_corners=False)
             map_pc = map_pc.squeeze().cpu().numpy()
-        except Exception as e:
-            print(f"⚠️ Error during PatchCore inference: {e}")
-            map_pc = None
+        except: map_pc = np.zeros((H, W))
     else:
-        # Return zero-filled dummy map if model is missing
         map_pc = np.zeros((H, W))
 
-    # --- WEDGE-Net Inference (Fixed Logic) ---
+    # --- WEDGE-Net Inference ---
     features_wd, _ = model_wd(img_tensor)
-    
-    # [Important] Get feature map height (h_wd) and width (w_wd) directly. (Usually 28x28)
     B, C, h_wd, w_wd = features_wd.shape 
-    
     flat_wd = features_wd.view(C, -1).permute(1, 0)
     dists_wd = torch.cdist(flat_wd, bank_wd)
     min_dist_wd, _ = dists_wd.min(dim=1)
     
-    # [Fix] Reshape to (h_wd, w_wd) first, not directly to (H, W).
     map_wd = min_dist_wd.reshape(h_wd, w_wd).unsqueeze(0).unsqueeze(0)
-    
-    # [Fix] Then, interpolate to original image size (H, W).
     map_wd = F.interpolate(map_wd, size=(H, W), mode='bilinear', align_corners=False)
     map_wd = map_wd.squeeze().cpu().numpy()
     
     return map_pc, map_wd
 
 # ==============================================================================
-# 3. Main Execution Function
+# 4. Main Execution
 # ==============================================================================
-def run_noise_visualization():
-    print(f"🎨 Generating Noise Robustness Figure for {CATEGORY.upper()}...")
+def run_noise_experiment():
+    print("\n" + "="*60)
+    print(" 🎨 Starting Noise Robustness Experiment (Figure 5)")
+    print("="*60)
     os.makedirs(BASE_DIR, exist_ok=True)
 
-    # ---------------------------------------------------------
-    # 1. Load Models & Memory Banks
-    # ---------------------------------------------------------
-    # [Modified] Flag to check PatchCore existence
-    HAS_PC = False
-    pc_model = None
-    pc_bank = None
-
-    print(f"🔍 Checking PatchCore: {PATH_PC}")
-    if os.path.exists(PATH_PC): 
-        try:
-            print("   -> Found! Loading PatchCore...")
-            pc_model = models.wide_resnet50_2(pretrained=True).to(DEVICE).eval()
-            for p in pc_model.parameters(): p.requires_grad = False
-            
-            pc_ckpt = torch.load(PATH_PC, map_location=DEVICE)
-            pc_bank = pc_ckpt['memory_bank'].to(DEVICE) if isinstance(pc_ckpt, dict) else pc_ckpt.to(DEVICE)
-            HAS_PC = True
-        except Exception as e:
-            print(f"   -> Error loading PatchCore: {e}. Skipping...")
-            HAS_PC = False
+    # [Logic] Use 'all' or Single Category
+    raw_cat = getattr(config, 'CATEGORY', 'tile') 
+    
+    if str(raw_cat).lower() == 'all':
+        print("\n" + "!"*60)
+        print(" ⛔ [STOP] CATEGORY = 'all' detected!")
+        print(" This script requires a SINGLE category to prevent file flooding.")
+        print(" 👉 Action: Please change 'config.py' to: CATEGORY = 'tile' (or 'bottle', etc.)")
+        print("!"*60 + "\n")
+        sys.exit(0) # Terminate the script
     else:
-        print("   -> Not found. Skipping comparison (Running WEDGE-Net only).")
-    
-    # Load WEDGE-Net (Mandatory, exit if missing)
-    print(f"Loading WEDGE-Net: {PATH_WEDGE}")
-    if not os.path.exists(PATH_WEDGE): 
-        return print(f"🚨 Critical Error: WEDGE-Net model not found at {PATH_WEDGE}")
-        
-    wedge_model = WEDGE_Net(use_semantic=True).to(DEVICE).eval()
-    wedge_ckpt = torch.load(PATH_WEDGE, map_location=DEVICE)
-    wedge_bank = wedge_ckpt['memory_bank'].to(DEVICE) if isinstance(wedge_ckpt, dict) else wedge_ckpt.to(DEVICE)
-    
-    # Downsample large memory bank for visualization speed
-    if wedge_bank.shape[0] > 10000:
-        print("⚡ Downsampling large memory bank for visualization speed...")
-        torch.manual_seed(42)
-        idx = torch.randperm(wedge_bank.shape[0])[:int(wedge_bank.shape[0]*0.1)]
-        wedge_bank = wedge_bank[idx]
+        target_categories = [str(raw_cat)]
+        print(f" [Mode] Processing SINGLE category: {raw_cat}")
 
-    # ---------------------------------------------------------
-    # 2. Select Normal Image
-    # ---------------------------------------------------------
-    dataset = MVTecDataset(root_dir=config.DATA_PATH, category=CATEGORY, phase='test')
-    target_img = None
-    
-    # Search for the first 'Normal (Label 0)' image starting from index 0
-    for i in range(len(dataset)):
-        img, label, _, path = dataset[i]
-        lbl_val = label.item() if hasattr(label, 'item') else label
+    for category in target_categories:
+        print(f"\n>> Processing Category: {category.upper()}")
         
-        if lbl_val == 0: # Normal
-            target_img = img.to(DEVICE)
-            print(f"✅ Selected Normal Image Index: {i}")
-            break
+        # 1. Path Setup
+        wedge_base = os.path.join(getattr(config, 'OurModel_DIR', 'WEDGE-Net'), ratio_suffix)
+        path_wedge = find_best_model_path(wedge_base, category)
+
+        pc_base = getattr(config, 'CompareModel_DIR', "patch_core_pt")
+        # Try to find '10pct' file first
+        path_pc = find_best_model_path(pc_base, category, target_str="10pct") 
+        if path_pc is None: path_pc = find_best_model_path(pc_base, category)
+
+        if not path_wedge:
+            print(f"   [Skip] WEDGE-Net model not found in {wedge_base}")
+            continue
+
+        # 2. Load Models
+        HAS_PC = False
+        pc_model, pc_bank = None, None
+        if path_pc:
+            try:
+                print(f"   [Load] PatchCore: {os.path.basename(path_pc)}")
+                pc_model = models.wide_resnet50_2(weights=models.Wide_ResNet50_2_Weights.IMAGENET1K_V1).to(DEVICE).eval()
+                pc_ckpt = torch.load(path_pc, map_location=DEVICE)
+                pc_bank = pc_ckpt['memory_bank'].to(DEVICE) if isinstance(pc_ckpt, dict) else pc_ckpt.to(DEVICE)
+                HAS_PC = True
+            except: 
+                print(f"   [Warning] Failed to load PatchCore file.")
+        
+        try:
+            print(f"   [Load] WEDGE-Net: {os.path.basename(path_wedge)}")
+            wedge_model = WEDGE_Net(use_semantic=True).to(DEVICE).eval()
+            wedge_ckpt = torch.load(path_wedge, map_location=DEVICE)
+            wedge_bank = wedge_ckpt['memory_bank'].to(DEVICE) if isinstance(wedge_ckpt, dict) else wedge_ckpt.to(DEVICE)
+        except Exception as e:
+            print(f"   [Error] Failed to load WEDGE-Net: {e}")
+            continue
+        
+        if wedge_bank.shape[0] > 10000:
+            idx = torch.randperm(wedge_bank.shape[0])[:int(wedge_bank.shape[0]*0.5)]
+            wedge_bank = wedge_bank[idx]
+
+        # 3. Data Selection
+        try:
+            dataset = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
+        except:
+            print(f"   [Error] Dataset not found for {category}")
+            continue
+
+        target_img = None
+        for i in range(len(dataset)):
+            img, label, _, path = dataset[i]
+            if (label.item() if hasattr(label, 'item') else label) == 0:
+                target_img = img.to(DEVICE)
+                break
+        
+        if target_img is None:
+            print("   [Skip] No normal image found.")
+            continue
+
+        # 4. Generate Figure
+        fig, axes = plt.subplots(4, 4, figsize=(16, 16))
+        plt.subplots_adjust(wspace=0.05, hspace=0.05)
+        
+        for i, noise_level in enumerate(NOISE_LEVELS):
+            img_raw = unorm(target_img).to(DEVICE) 
+            noise = torch.randn_like(img_raw) * (noise_level / 255.0)
+            noisy_raw = torch.clamp(img_raw + noise, 0, 1)
+            noisy_model = norm(noisy_raw.squeeze(0)).unsqueeze(0).to(DEVICE)
             
-    if target_img is None:
-        return print("🚨 No normal image found in test dataset!")
+            with torch.no_grad():
+                raw_pc, raw_wd = get_maps(pc_model, pc_bank, wedge_model, wedge_bank, noisy_model)
+            
+            if HAS_PC: raw_pc = gaussian_filter(raw_pc, sigma=4)
+            raw_wd = gaussian_filter(raw_wd, sigma=4)
+            
+            clean_disp = tensor_to_img_numpy(img_raw.squeeze(0))
+            noisy_disp = tensor_to_img_numpy(noisy_raw.squeeze(0))
 
-    # ---------------------------------------------------------
-    # 3. Figure Generation & Loop
-    # ---------------------------------------------------------
-    fig, axes = plt.subplots(4, 4, figsize=(16, 16))
-    plt.subplots_adjust(wspace=0.05, hspace=0.05)
-    
-    for i, noise_level in enumerate(NOISE_LEVELS):
-        # -----------------------------------------------------
-        # [Key Update] Correct Noise Injection Pipeline
-        # -----------------------------------------------------
-        # 1. UnNormalize: Restore normalized tensor to 0-1 range
-        img_raw = unorm(target_img).to(DEVICE)
-        
-        # 2. Add Noise: Add noise in 0-1 range and clamp
-        noise = torch.randn_like(img_raw) * (noise_level / 255.0)
-        noisy_img_raw = torch.clamp(img_raw + noise, 0, 1)
-        
-        # 3. Re-Normalize: Re-normalize for model input
-        # squeeze/unsqueeze handles cases where norm expects (C,H,W)
-        noisy_img_model = norm(noisy_img_raw.squeeze(0)).unsqueeze(0).to(DEVICE)
-        
-        with torch.no_grad():
-            # Handled internally even if pc_model is None
-            raw_pc, raw_wd = get_maps(pc_model, pc_bank, wedge_model, wedge_bank, noisy_img_model)
-        
-        # Apply Gaussian Smoothing (Mandatory)
-        if HAS_PC: raw_pc = gaussian_filter(raw_pc, sigma=4)
-        raw_wd = gaussian_filter(raw_wd, sigma=4)
-        
-        # Images for visualization (Convert to Numpy)
-        clean_disp = tensor_to_img_numpy(img_raw.squeeze(0)) 
-        noisy_disp = tensor_to_img_numpy(noisy_img_raw.squeeze(0))
+            v_min = raw_wd.min()
+            current_max = raw_wd.max()
+            if HAS_PC:
+                v_min = min(raw_pc.min(), v_min)
+                current_max = max(raw_pc.max(), current_max)
+            v_max = current_max if (current_max - v_min) > 0.5 else v_min + 0.5
 
-        # [Fix] Smart Visualization Scaling
-        # 1. Determine the baseline (Blue point).
-        # We use the actual minimum value of the map so the lowest score is always Blue.
-        v_min = raw_wd.min()
-        current_max = raw_wd.max()
-        
-        if HAS_PC:
-            v_min = min(raw_pc.min(), v_min)
-            current_max = max(raw_pc.max(), current_max)
-        
-        # 2. Determine the ceiling (Red point).
-        v_max = current_max
+            ax = axes[i, 0]
+            ax.imshow(clean_disp)
+            ax.set_ylabel(f"Noise $\sigma={noise_level}$", fontsize=16, fontweight='bold')
+            ax.set_xticks([]); ax.set_yticks([])
 
-        # 3. [Crucial] Apply 'Minimum Dynamic Range'
-        # Instead of fixing v_max, we ensure the GAP between min and max is large enough.
-        # If max - min is too small (e.g., 0.01 noise), we artificially stretch v_max.
-        # This keeps the image Blue when there are no significant anomalies.
-        actual_gap = v_max - v_min
-        SAFETY_GAP = 0.5  # If the variation is smaller than this, it's considered noise.
-        
-        if actual_gap < SAFETY_GAP:
-            v_max = v_min + SAFETY_GAP
+            ax = axes[i, 1]
+            ax.imshow(noisy_disp)
+            ax.set_xticks([]); ax.set_yticks([])
 
-        # --- Plotting ---
-        # Col 0: Clean Original
-        ax_clean = axes[i, 0]
-        ax_clean.imshow(clean_disp)
-        ax_clean.set_xticks([]); ax_clean.set_yticks([])
-        ax_clean.set_ylabel(f"Noise $\sigma={noise_level}$", fontsize=18, fontweight='bold', labelpad=10)
+            ax = axes[i, 2]
+            if HAS_PC:
+                ax.imshow(noisy_disp)
+                ax.imshow(raw_pc, cmap='jet', alpha=0.5, vmin=v_min, vmax=v_max)
+                ax.text(0.95, 0.05, f"{raw_pc.max():.2f}", color='white', fontweight='bold', transform=ax.transAxes, ha='right', bbox=dict(facecolor='black', alpha=0.5))
+            else:
+                ax.set_facecolor('gray')
+                ax.text(0.5, 0.5, "N/A", ha='center')
+            ax.set_xticks([]); ax.set_yticks([])
 
-        # Col 1: Noisy Input
-        ax_noisy = axes[i, 1]
-        ax_noisy.imshow(noisy_disp)
-        ax_noisy.set_xticks([]); ax_noisy.set_yticks([])
+            ax = axes[i, 3]
+            ax.imshow(noisy_disp)
+            ax.imshow(raw_wd, cmap='jet', alpha=0.5, vmin=v_min, vmax=v_max)
+            ax.text(0.95, 0.05, f"{raw_wd.max():.2f}", color='white', fontweight='bold', transform=ax.transAxes, ha='right', bbox=dict(facecolor='black', alpha=0.5))
+            ax.set_xticks([]); ax.set_yticks([])
 
-        # Col 2: PatchCore (Conditional Display)
-        ax_pc = axes[i, 2]
-        if HAS_PC:
-            ax_pc.imshow(noisy_disp)
-            ax_pc.imshow(raw_pc, cmap='jet', alpha=0.5, vmin=v_min, vmax=v_max)
-            score_pc = raw_pc.max()
-            ax_pc.text(0.95, 0.05, f"{score_pc:.3f}", color='white', fontsize=20, fontweight='bold',
-                       ha='right', va='bottom', transform=ax_pc.transAxes,
-                       bbox=dict(facecolor='black', alpha=0.6, edgecolor='none', pad=3))
-        else:
-            # Display placeholder message on gray background if file is missing
-            ax_pc.set_facecolor('lightgray')
-            ax_pc.text(0.5, 0.5, "Checkpoint\nNot Found\n(Skipped)", 
-                       ha='center', va='center', fontsize=14, color='gray')
-        ax_pc.set_xticks([]); ax_pc.set_yticks([])
+        wd_label = ratio_suffix.replace('pct', '%').replace('_', '.')
+        pc_label = "10%" if path_pc and "10pct" in path_pc else "100%"
 
-        # Col 3: WEDGE-Net
-        ax_wd = axes[i, 3]
-        ax_wd.imshow(noisy_disp)
-        ax_wd.imshow(raw_wd, cmap='jet', alpha=0.5, vmin=v_min, vmax=v_max)
-        ax_wd.set_xticks([]); ax_wd.set_yticks([])
-        score_wd = raw_wd.max()
-        ax_wd.text(0.95, 0.05, f"{score_wd:.3f}", color='white', fontsize=20, fontweight='bold',
-                   ha='right', va='bottom', transform=ax_wd.transAxes,
-                   bbox=dict(facecolor='black', alpha=0.6, edgecolor='none', pad=3))
+        cols = ['Original', 'Noisy Input', f'PatchCore ({pc_label})', f'WEDGE-Net ({wd_label})']
+        for ax, col in zip(axes[0], cols):
+            ax.set_title(col, fontsize=18, fontweight='bold', pad=10)
 
-    # Set Headers
-    cols = ['(a) Original', '(b) Noisy Input', '(c) PatchCore (Ref)', '(d) WEDGE-Net (Ours)']
-    for ax, col in zip(axes[0], cols):
-        ax.set_title(col, fontsize=22, fontweight='bold', pad=15)
+        save_path = os.path.join(BASE_DIR, f"Figure5_Noise_Robustness_{category}_{ratio_suffix}.png")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"   ✅ Saved: {save_path}")
 
-    plt.tight_layout()
-    save_name = os.path.join(BASE_DIR, f"Figure_Noise_Robustness_{CATEGORY}.png")
-    plt.savefig(save_name, dpi=300, bbox_inches='tight')
-    print(f"✅ Figure Saved: {save_name}")
+    print("\n[Done] All tasks complete.")
 
 if __name__ == '__main__':
-    run_noise_visualization()
+    run_noise_experiment()
