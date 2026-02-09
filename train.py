@@ -56,6 +56,7 @@ def get_ratio_name(ratio):
     if ratio == 1.0: return "100pct"
     elif ratio == 0.1: return "10pct"
     elif ratio == 0.01: return "1pct"
+    elif abs(ratio - 0.001) < 1e-6: return "0_1pct"
     else: return f"{int(ratio*100)}pct"
 
 def train_category(category, device):
@@ -69,8 +70,8 @@ def train_category(category, device):
     raw_ratio = getattr(config, 'SAMPLING_RATIO', 1.0)
     
     if raw_ratio == 'all':
-        target_ratios = [1.0, 0.1, 0.01]
-        print(f"\n[Training] Category: {category} | Mode: Process ALL ratios (100%, 10%, 1%)")
+        target_ratios = [1.0, 0.1, 0.01, 0.001]
+        print(f"\n[Training] Category: {category} | Mode: Process ALL ratios (100%, 10%, 1%, 0.1%)")
     else:
         requested_ratio = float(raw_ratio)
         if requested_ratio == 1.0:
