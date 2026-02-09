@@ -4,31 +4,18 @@ import torch.nn.functional as F
 from torchvision.models import resnet50, ResNet50_Weights
 import config
 
-# ==========================================================================
-# [Module] Input-Space DWT (Unified Frequency Extractor)
-# ==========================================================================
+# [InputSpace_DWT remains unchanged as requested]
 class InputSpace_DWT(nn.Module):
-    """
-    Performs discrete wavelet transform (DWT).
-    Calculates Total Spectral Energy (LL included) to match Equation (2) in the paper.
-    """
     def __init__(self): 
         super(InputSpace_DWT, self).__init__()
-        
-        # 1. Grayscale conversion using ITU-R 601-2 luma transform
         self.to_gray = nn.Conv2d(3, 1, kernel_size=1, bias=False)
         self.to_gray.weight.data = torch.tensor([[[[0.299]], [[0.587]], [[0.114]]]])
         self.to_gray.weight.requires_grad = False
-        
-        # 2. Load wavelet kernel type from config
         self.wavelet_type = getattr(config, 'WAVELET_TYPE', 'haar')
-
         if self.wavelet_type == 'bior2.2':
-            # Biorthogonal 2.2 (5x5 Kernel)
             self.register_buffer('kernel', self._get_bior22_kernel())
             self.pad_size = 2 
         else:
-            # Standard Haar Wavelet (2x2 Kernel)
             self.register_buffer('kernel', self._get_haar_kernel())
             self.pad_size = 0 
 
@@ -49,31 +36,19 @@ class InputSpace_DWT(nn.Module):
         return torch.stack([ll, lh, hl, hh]).unsqueeze(1)
 
     def forward(self, x_input):
-        # Convert to Grayscale
         x_gray = self.to_gray(x_input) 
-        
-        # Perform DWT Convolution
         if self.pad_size > 0:
             x_gray = F.pad(x_gray, (self.pad_size, self.pad_size, self.pad_size, self.pad_size), mode='reflect')
-
         dwt_maps = F.conv2d(x_gray, self.kernel, stride=1, padding=0)
-        
-        # For Haar, align dimensions if necessary
         if self.wavelet_type == 'haar':
              dwt_maps = F.pad(dwt_maps, (0, 1, 0, 1)) 
-        
-        # Total Spectral Energy (Includes LL) 
-        # Matches Equation: G = sqrt(LL^2 + LH^2 + HL^2 + HH^2)
         total_energy = torch.sum(dwt_maps ** 2, dim=1, keepdim=True)
         guidance_map = torch.sqrt(total_energy)
-        
-        # Min-Max Normalization for stable attention gating
         guidance_map = (guidance_map - guidance_map.min()) / (guidance_map.max() - guidance_map.min() + 1e-6)
-        
         return guidance_map
 
 # ==========================================================================
-# [V 3_2] WEDGE_Net (Unified Architecture)
+# [V3_2] WEDGE-Net: Wavelet-Enhanced Dual-stream Guided Embedding Network
 # ==========================================================================
 class WEDGE_Net(nn.Module):
     def __init__(self, use_semantic=False):
@@ -81,16 +56,20 @@ class WEDGE_Net(nn.Module):
         
         self.use_semantic = use_semantic 
         
-        # 1. Unified DWT Module
+        # 1. Frequency Stream (Noise Filtering)
+        # Filters out high-frequency environmental noise using DWT.
         self.input_dwt = InputSpace_DWT()
         
-        # 2. Context Stream (Backbone: Pre-trained ResNet50)
+        # 2. Context Stream (Semantic Representation)
+        # Uses a pre-trained ResNet-50 backbone to capture object semantics.
+        # We explicitly use the standard ResNet-50 (not WideResNet) for efficiency.
         backbone = resnet50(weights=ResNet50_Weights.IMAGENET1K_V1)
         self.stem = nn.Sequential(backbone.conv1, backbone.bn1, backbone.relu, backbone.maxpool, backbone.layer1)
-        self.layer2 = backbone.layer2 # Output: 512ch (Stride 8)
-        self.layer3 = backbone.layer3 # Output: 1024ch (Stride 16)
+        self.layer2 = backbone.layer2 # Output: 512 channels
+        self.layer3 = backbone.layer3 # Output: 1024 channels
 
-        # 3. Side-Path: Frequency Encoder
+        # 3. Frequency Attention Encoder
+        # Generates a spatial attention map from the frequency guidance to modulate the backbone features.
         self.freq_encoder = nn.Sequential(
             nn.Conv2d(1, 64, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -98,79 +77,103 @@ class WEDGE_Net(nn.Module):
             nn.ReLU()
         )
         
-        # Projection layer for channel matching (512 -> 1024 for Layer3)
+        # Project frequency features to match Layer 3 dimensions (512 -> 1024)
         self.proj_to_f3 = nn.Conv2d(512, 1024, kernel_size=1, bias=False)
         
-        print(f"[WEDGE-Net] Initialized. Wavelet: {self.input_dwt.wavelet_type.upper()}")
+        # ==========================================================
+        # Dimensionality Projection Layer (Optional)
+        # ==========================================================
+        # We calculate the total feature dimension based on the configuration.
+        # Base: 512 (Layer 2) + 1024 (Layer 3) = 1536
+        # With Semantic: 1536 + 512 = 2048
+        current_dim = 1536
+        if self.use_semantic:
+            current_dim += 512 
+            
+        self.target_dim = 1024
+        
+        # [Configuration Control]
+        # Set to False to maintain full feature resolution (2048-dim) for maximum accuracy.
+        # Set to True to enable projection (1024-dim) for reduced memory footprint.
+        self.use_projection = False 
+
+        if self.use_projection:
+            # Linear projection layer (Random Projection equivalent if bias=False)
+            self.dim_reducer = nn.Conv2d(current_dim, self.target_dim, kernel_size=1, bias=False)
+            print(f"[WEDGE-Net] Projection Enabled: Compressed features {current_dim}D -> {self.target_dim}D")
+        else:
+            # If disabled, we do not initialize the layer to save parameters.
+            self.dim_reducer = None
+            # print(f"[WEDGE-Net] Projection Disabled: Using full features ({current_dim}D)")
+
 
     def forward(self, x):
-        """
-        Forward pass with Wavelet-based Attention Gating.
-        Returns features for training and maps for visualization.
-        """
-        # 1. Frequency Stream (Guidance Map)
+        # -----------------------------------------------------------
+        # Stream 1: Frequency Guidance Generation
+        # -----------------------------------------------------------
         guidance_map = self.input_dwt(x)
         
-        # 2. Context Stream
+        # -----------------------------------------------------------
+        # Stream 2: Semantic Feature Extraction (Context Stream)
+        # -----------------------------------------------------------
         x_stem = self.stem(x)
-        f2 = self.layer2(x_stem) # [B, 512, 28, 28]
-        f3 = self.layer3(f2)     # [B, 1024, 14, 14]
+        f2 = self.layer2(x_stem) 
+        f3 = self.layer3(f2)      
         
-        # Upsample f3 to match f2 for concatenation later
         f3_up = F.interpolate(f3, size=(28, 28), mode='bilinear', align_corners=False)
 
-        # 3. Side Path (Frequency Gating Mechanism)
+        # -----------------------------------------------------------
+        # Frequency-Aware Attention Gating
+        # -----------------------------------------------------------
+        # Modulate semantic features using the frequency guidance map
         guide_small = F.interpolate(guidance_map, size=(28, 28), mode='bilinear', align_corners=False)
         f_freq = self.freq_encoder(guide_small)
 
-        # 4. Multi-scale Feature Fusion via Attention Gating
-        # Gating for Layer 2
+        # Apply attention to Layer 2 features
         f_freq_sigmoid = torch.sigmoid(f_freq) 
         f2_final = f2 * (1 + f_freq_sigmoid)
         
-        # Gating for Layer 3 (Projected)
+        # Apply attention to Layer 3 features
         f_freq_up = self.proj_to_f3(f_freq) 
         f_freq_sigmoid_up = torch.sigmoid(f_freq_up)
         f3_final = f3_up * (1 + f_freq_sigmoid_up)
 
-        # 5. Feature Aggregation
+        # -----------------------------------------------------------
+        # Feature Aggregation & Semantic Guidance
+        # -----------------------------------------------------------
         feat_to_concat = []
         feat_to_concat.extend([
             F.normalize(f2_final, p=2, dim=1),
             F.normalize(f3_final, p=2, dim=1)
         ])
 
-        # ==========================================================
-        # [Split Logic] Training Map vs Visualization Map
-        # ==========================================================
+        # Generate Semantic Attention Mask (Object Consistency)
         raw_source = f2 
-        
-        # (A) Map for Training (L1-Norm based)
-        # Using L1-Norm (Absolute value) ensures stable gradient flow during training.
-        amp_train = torch.mean(torch.abs(raw_source), dim=1, keepdim=True)
-        sem_train = (amp_train - amp_train.min()) / (amp_train.max() - amp_train.min() + 1e-6)
-
-        # (B) Map for Visualization (L2-Norm based)
-        # Using L2-Norm (Squared value) represents the spectral energy density,
-        # providing a clearer representation of structural activations.
         amp_vis = torch.mean(torch.pow(raw_source, 2), dim=1, keepdim=True)
         sem_vis = (amp_vis - amp_vis.min()) / (amp_vis.max() - amp_vis.min() + 1e-6)
 
-        # Optional: Semantic Module (Gating)
         if self.use_semantic:
+            # Use Layer 2 activation magnitude as a semantic mask
+            amp_train = torch.mean(torch.abs(raw_source), dim=1, keepdim=True)
+            sem_train = (amp_train - amp_train.min()) / (amp_train.max() - amp_train.min() + 1e-6)
+            
             norm_raw = F.normalize(raw_source, p=2, dim=1)
-            # IMPORTANT: Use 'sem_train' here to maintain training stability
+            # Weighted concatenation of semantic features
             feat_to_concat.append(norm_raw * sem_train * 2.0)
         
-        # Final Concatenation and Smoothing
+        # Final Feature Vector Construction
         features = torch.cat(feat_to_concat, dim=1)
+        
+        # Optional Dimensionality Reduction
+        if self.use_projection and self.dim_reducer is not None:
+             features = self.dim_reducer(features)
+
+        # Spatial Smoothing for robustness against local noise
         features = F.avg_pool2d(features, kernel_size=3, stride=1, padding=1)
         
-        # Return features (for Coreset) and maps dictionary (for Visualization)
-        # Note: We return 'sem_vis' to generate clearer figures.
         maps = {
             'freq': guidance_map,  
-            'sem': sem_vis    
+            'sem': sem_vis      
         }
         
         return features, maps
