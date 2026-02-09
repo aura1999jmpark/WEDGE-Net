@@ -87,7 +87,7 @@ Extracts features from training images and constructs the memory bank (`.pt` fil
 
 **Key Configurations to Check:**
 - `CATEGORY`: Target class (e.g., `'tile'` or `'all'`).
-- `SAMPLING_RATIO`: Memory size to retain (e.g., `0.1` for 10%, `0.01` for 1%, or `'all'`).
+- `SAMPLING_RATIO`: Memory size to retain (e.g., `0.1` (10%), `0.01` (1%), `0.001` (0.1%), or `'all'`).
 - `SAMPLING_METHOD`: Sampling strategy (`'coreset'` or `'random'`).
 ```bash
 python train.py
@@ -217,7 +217,7 @@ python eval_gap_score.py
 After setting up and running experiments, your directory structure should look like this.
 > **Note:**
 > 1. The default `SAVE_DIR` is set to `WEDGE-Net`.
-> 2. **Sub-folders (e.g., `10pct/`, `1pct/`) are automatically created** inside `SAVE_DIR` based on your `SAMPLING_RATIO` setting, and the trained `.pt` files are saved there.
+> 2. **Sub-folders (e.g., `10pct/`, `1pct/`, `0_1pct/`) are automatically created** inside `SAVE_DIR` based on your `SAMPLING_RATIO` setting, and the trained `.pt` files are saved there.
 ```text
 WEDGE-Net/
 ├── config.py                 # Main Configuration
@@ -237,9 +237,10 @@ WEDGE-Net/
 │   ├── 10pct/                # Proposed Baseline (10% Coreset)
 │   │   ├── model_data_tile_10pct.pt
 │   │   └── results/          # Visualization Figures (Fig 3)
-│   └── 1pct/                 # Extreme Compression
+│   ├── 1pct/                 # Extreme Compression (Main)
+│   └── 0_1pct/               # 0.1% Stress Test
 │
-└── WEDGE-Net_Sem_OFF/# [Discussion] Semantic OFF Model
+└── WEDGE-Net_Sem_OFF/        # [Discussion] Semantic OFF Model
     │                         # * Used for Table 7 (Score Gap Analysis).
     └── 10pct/                # * Created by changing settings in config.py (see below).
         └── model_data_tile_10pct.pt
