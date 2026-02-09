@@ -7,14 +7,14 @@
 
 Official PyTorch Implementation of WEDGE-Net
 
-> Abstract: WEDGE-Net is a frequency-aware anomaly detection framework designed for resource-constrained edge devices. By leveraging Discrete Wavelet Transform (DWT) and a Semantic Module, it achieves SOTA-level performance using only 1% of the memory bank, delivering 700 FPS on an RTX 4090.
+> Abstract: WEDGE-Net is a frequency-aware anomaly detection framework designed for resource-constrained edge devices. By leveraging Discrete Wavelet Transform (DWT) and a Semantic Module, it achieves SOTA-level performance using only 1% of the memory bank, delivering 686 FPS on an RTX 4090.
 
 ## Architecture
 Figure 1: Overview of WEDGE-Net architecture.
 <img width="2848" height="1504" alt="architecture11" src="https://github.com/user-attachments/assets/c7ea825a-0dc3-4314-bffb-500036c661b4" />
 
 ## ✨ Key Features
-- **Extreme Efficiency:** 2.1x faster inference (**700 FPS**) compared to PatchCore.
+- **Extreme Efficiency:** 2.1x faster inference (**686 FPS**) compared to PatchCore.
 - **Memory Efficient:** Uses only **1%** of the memory bank via Greedy Coreset.
 - **Noise Robust:** Filters out environmental noise using DWT (Frequency Stream).
 - **Plug-and-Play:** Simple architecture compatible with standard ResNet backbones.
@@ -120,7 +120,7 @@ python test.py
 
 ### 4. Performance
 
-We **propose the 1% memory bank setting** as the optimal configuration for extreme edge efficiency. It achieves over **700 FPS**, demonstrating a significant speed advantage (**approx. 2.1x faster**) compared to the light-weight PatchCore (10%) baseline.
+We **propose the 1% memory bank setting** as the optimal configuration for extreme edge efficiency. It achieves over **600 FPS**, demonstrating a significant speed advantage (**approx. 2.1x faster**) compared to the light-weight PatchCore (10%) baseline.
 
 ### ⚡ Inference Speed Comparison
 Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
@@ -129,7 +129,7 @@ Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
 | :--- | :---: | :---: | :---: |
 | PatchCore (Ref) | 100% | 37 | - |
 | PatchCore (Ref) | 10% | 336 | - |
-| **WEDGE-Net (Ours)** | **1% (Main)** | **706** | **2.1x** (vs PC 10%) |
+| **WEDGE-Net (Ours)** | **1% (Main)** | **686** | **2.1x** (vs PC 10%) |
 
 **How to run:**
 1. Set `SAMPLING_RATIO` in `config.py` to match the **trained checkpoints (.pt files)** you currently have.
