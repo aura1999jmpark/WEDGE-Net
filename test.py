@@ -22,9 +22,10 @@ ALL_CATEGORIES = [
 
 def get_ratio_name(ratio):
     """Helper to match folder naming convention."""
-    if ratio == 1.0: return "100pct"
-    elif ratio == 0.1: return "10pct"
-    elif ratio == 0.01: return "1pct"
+    if ratio >= 0.99: return "100pct"
+    elif abs(ratio - 0.1) < 1e-6: return "10pct"
+    elif abs(ratio - 0.01) < 1e-6: return "1pct"
+    elif abs(ratio - 0.001) < 1e-6: return "0_1pct"
     else: return f"{int(ratio*100)}pct"
 
 def normalize_map(m):
@@ -45,9 +46,9 @@ def test_inference():
     # 1. Determine Target Ratios
     raw_ratio = getattr(config, 'SAMPLING_RATIO', '0.1')
     if str(raw_ratio).lower() == 'all':
-        # Default to 0.1 if 'all' is selected for visualization to prevent overflow
-        print(" [Info] 'all' ratio selected. Defaulting to 10% (0.1) for visualization.")
-        target_ratios = [0.1]
+        # Default to 0.01 if 'all' is selected for visualization to prevent overflow
+        print(" [Info] 'all' ratio selected. Defaulting to 1% (0.01) for visualization.")
+        target_ratios = [0.01]
     else:
         target_ratios = [float(raw_ratio)]
 
