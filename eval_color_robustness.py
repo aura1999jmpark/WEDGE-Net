@@ -1,10 +1,11 @@
 """
-Color Robustness Evaluation Script 
+Color Robustness Evaluation Script (Final Version)
 - Auto-detects PatchCore model files regardless of naming convention.
 - Evaluates AUROC under varying Color Jitter intensities.
 """
 
 import os
+import sys  # [Fixed] Added missing import for sys.exit()
 import torch
 import torch.nn.functional as F
 import pandas as pd
@@ -176,6 +177,17 @@ def run_color_evaluation():
     
     os.makedirs(SAVE_DIR, exist_ok=True)
 
+    # --------------------------------------------------------------------------
+    # [Safety Check] Stop if CATEGORY is 'all'
+    # --------------------------------------------------------------------------
+    if str(CATEGORY).lower() == 'all':
+        print("\n" + "!"*60)
+        print(" ⛔ [STOP] CATEGORY = 'all' detected!")
+        print(" This evaluation script requires a SINGLE category.")
+        print(" 👉 Action: Please change 'config.py' to: CATEGORY = 'tile' (or 'bottle', etc.)")
+        print("!"*60 + "\n")
+        sys.exit(0)
+
     # 1. Load Models
     print("Loading models...", end=" ")
     
@@ -301,8 +313,4 @@ def run_color_evaluation():
     plt.ylim(50, 105) 
     
     fig_name = f"figure6_color_robustness_{CATEGORY}_{RATIO_FOLDER}.png"
-    plt.savefig(os.path.join(SAVE_DIR, fig_name), dpi=300, bbox_inches='tight')
-    print(f"[Info] Graph Saved: {os.path.join(SAVE_DIR, fig_name)}")
-
-if __name__ == '__main__':
-    run_color_evaluation()
+    plt.savefig(os.path.join(SAVE_DIR, fig_name), dpi=300, bbox_inches='tight
