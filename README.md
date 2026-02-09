@@ -20,7 +20,9 @@ Figure 1: Overview of WEDGE-Net architecture.
 - **Plug-and-Play:** Simple architecture compatible with standard ResNet backbones.
 
 ## Dependencies
-- Python 3.9
+- **Python 3.9 (Strictly Recommended)**
+  > ⚠️ **Warning:** Please ensure you install **Python 3.9**.
+  > Using newer versions (e.g., Python 3.10, 3.11+) is **NOT recommended** as it frequently causes dependency conflicts and instability with the required libraries.
 - PyTorch 1.10+
 - Torchvision
 - Scipy, Scikit-learn, Tqdm, Matplotlib
@@ -55,7 +57,7 @@ You can control all experimental settings in `config.py`. Key parameters are exp
 | Parameter | Description |
 | :--- | :--- |
 | `SAVE_DIR` | **Root Directory** where the memory banks will be saved (e.g., `"WEDGE-Net"`). |
-| `SAMPLING_RATIO` | Coreset sampling ratio. <br> **Note:** The script **automatically creates sub-folders** based on this value: <br> - `'all'` $\rightarrow$ Generates `100pct/`, `10pct/`, and `1pct/` folders simultaneously. <br> - `0.1` $\rightarrow$ Generates a `10pct/` folder. <br> - `0.01` $\rightarrow$ Generates a `1pct/` folder. |
+| `SAMPLING_RATIO` | Coreset sampling ratio. <br> **Note:** The script **automatically creates sub-folders** based on this value: <br> - `'all'` $\rightarrow$ Generates `100pct/`, `10pct/`, `1pct/`and `0_1pct/` folders simultaneously. <br> - `0.1` $\rightarrow$ Generates a `10pct/` folder. <br> - `0.01` $\rightarrow$ Generates a `1pct/` folder. |
 | `SAMPLING_METHOD` | `'coreset'` (Recommended) or `'random'`. |
 
 > **[IMPORTANT] Dynamic Path Loading for Visualization**
@@ -92,7 +94,7 @@ python train.py
 ```
 > **Note:**
 >
-> - Multi-Ratio Mode: If `SAMPLING_RATIO` is set to `'all'`, the script automatically generates sub-folders for **100pct**, **10pct**, and **1pct** under your `SAVE_DIR`.
+> - Multi-Ratio Mode: If `SAMPLING_RATIO` is set to `'all'`, the script automatically generates sub-folders for **100pct**, **10pct**, **1pct** and **0_1pct** under your `SAVE_DIR`.
 > - Multi-Category Mode: If `CATEGORY` is set to 'all', the script sequentially processes **all 15 MVTec AD categories** (from Bottle to Zipper) and saves the trained models into the sub-folder corresponding to your `SAMPLING_RATIO`.
 
 ### 2. Evaluation (Performance Metric)
@@ -112,22 +114,23 @@ python test.py
 > **Results:** Output images are saved in `[SAVE_DIR]/[RATIO]/results/[CATEGORY]/`. These figures highlight how the **Proposed Method** captures high-frequency structures and semantic context.
 > 
 > **⚠️ Note:**
-> For visualization, please **set a specific `SAMPLING_RATIO`** (e.g., `0.01`, `0.1`, `1.0`) in `config.py`.
+> For visualization, please **set a specific `SAMPLING_RATIO`** (e.g., `0.001`, `0.01`, `0.1`, `1.0`) in `config.py`.
 > * Unlike training, this script visualizes **one specific model setting** at a time to avoid excessive file generation.
 > * If `CATEGORY = 'all'`, it will generate results for all categories with that specific ratio.
 
 ### 4. Performance
 
-We **propose the 10% memory bank setting** as the optimal configuration to ensure stability and robust detection performance while maintaining high-speed inference. Although the 1% setting achieves extreme speeds (over 700 FPS), the 10% setting offers the best balance for industrial applications.
+We **propose the 1% memory bank setting** as the optimal configuration for extreme edge efficiency. It achieves over **700 FPS**, demonstrating a significant speed advantage (**approx. 2.1x faster**) compared to the light-weight PatchCore (10%) baseline.
 
 ### ⚡ Inference Speed Comparison
 Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
 
 | Model | Memory Bank | FPS (Inference) | Speedup |
 | :--- | :---: | :---: | :---: |
-| PatchCore (Ref) | 100% | 37 | 1.0x |
-| **WEDGE-Net (Ours)** | **10% (Proposed)** | **265** | **7.1x** |
-| WEDGE-Net (Ours) | 1% | 706 | 19.1x |
+| PatchCore (Ref) | 100% | 37 | - |
+| PatchCore (Ref) | 10% | 336 | - |
+| **WEDGE-Net (Ours)** | **1% (Main)** | **706** | **2.1x** (vs PC 10%) |
+
 **How to run:**
 1. Set `SAMPLING_RATIO` in `config.py` to match the **trained checkpoints (.pt files)** you currently have.
    * Example: `SAMPLING_RATIO = 0.01` (Benchmarks specific 1% models)
@@ -139,7 +142,7 @@ Experiments were conducted on the **MVTec AD** dataset using an NVIDIA RTX 4090.
 > -**Output:** Results are saved to WEDGE-Net/benchmark_fps_results_[ratio].csv.
 > **Note:**
 > * **FPS** values are averaged across all 15 MVTec AD categories.
-> * The **1% setting** demonstrates the model's capability for extreme efficiency, reaching **706.2 FPS**, which is approx. 19x faster than the baseline.
+
 ---
 
 ## 🛡️ Robustness Experiments
@@ -170,19 +173,30 @@ Visualizes the anomaly maps of normal samples under increasing Gaussian noise le
 ```bash
 python visualize_noise_robustness.py
 ```
-> **Output:** Figure_Noise_Robustness_{CATEGORY}.png (4x4 Visualization Tile)
+> **Output:** `Figure_Noise_Robustness_{CATEGORY}.png` (4x4 Visualization Tile)
+>
+> **⚠️ Important Configuration:**
+> * **Category:** You MUST set a **SINGLE** category (e.g., `CATEGORY = 'tile'`) in `config.py`. Using `all` will trigger a stop error to prevent flooding your directory with heavy image files.
+> * **Ratio:** If `SAMPLING_RATIO` is set to `'all'`, the script defaults to visualizing the **1% (Main Method)** model for clarity.
+>
+> **Note:**
+> * **Dynamic Loading:** The scripts automatically load the WEDGE-Net model corresponding to the `SAMPLING_RATIO` set in `config.py`.
+> * **PatchCore Handling:** If the PatchCore checkpoint is missing, the script will **not crash**. Instead, the PatchCore column in the output figure will be displayed as **"Skipped (Gray)"** or blank, allowing you to verify WEDGE-Net's results independently.
 
 ### 4. Qualitative Analysis: Color Jitter (Visualization)  
 Visualizes the anomaly maps under domain shifts (Brightness, Contrast, Saturation) to verify that the model does not misclassify altered normal images.
 ```bash
 python visualize_color_robustness.py
 ```
-> **Output:** Figure_Color_Robustness_{CATEGORY}_Final.png (4x4 Visualization Tile)
+> **Output:** `Figure_Color_Robustness_{CATEGORY}_Final.png` (4x4 Visualization Tile)
+>
+> **⚠️ Important Configuration:**
+> * **Category:** Like the noise script, please set a **SINGLE** category (e.g., `CATEGORY = 'tile'`) in `config.py`.
+> * **Ratio:** Defaults to **1%** if set to `'all'` to focus on the main contribution.
 >
 > **Note:**
->
-> - **Dynamic Loading:** The scripts automatically load the WEDGE-Net model corresponding to the `SAMPLING_RATIO` set in `config.py`.
-> - **PatchCore Handling:** If the PatchCore checkpoint is missing, the script will **not crash**. Instead, the PatchCore column in the output figure will be displayed as **"Skipped (Gray)"** or blank, allowing you to verify WEDGE-Net's results independently.
+> * **Dynamic Loading:** The scripts automatically load the WEDGE-Net model corresponding to the `SAMPLING_RATIO` set in `config.py`.
+> * **PatchCore Handling:** If the PatchCore checkpoint is missing, the script will **not crash**. Instead, the PatchCore column in the output figure will be displayed as **"Skipped (Gray)"** or blank, allowing you to verify WEDGE-Net's results independently.
 ---
 ## Discussion: Score Gap Analysis
 
