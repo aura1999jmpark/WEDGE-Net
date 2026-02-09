@@ -6,7 +6,7 @@ import os
 import numpy as np
 import csv
 import sys
-import contextlib  # [Added] Required to temporarily suppress stdout
+import contextlib  # Required to temporarily suppress stdout
 from model import WEDGE_Net
 from dataset import MVTecDataset
 import config  # Import updated config
@@ -30,7 +30,7 @@ if not DIR_OFF or DIR_OFF == "":
     sys.exit(1)
 
 # CSV Output Path
-CSV_NAME = config.GAP_RESULT_CSV
+CSV_NAME = getattr(config, 'GAP_RESULT_CSV', 'result_gap_via_sem_onoff.csv')
 CSV_PATH = os.path.join(DIR_ON, CSV_NAME)
 
 # Category Definitions
@@ -41,22 +41,32 @@ OBJECT_CLASSES = sorted([
 ])
 ALL_CATEGORIES = TEXTURE_CLASSES + OBJECT_CLASSES
 
-# Determine Target Ratio based on Config
-# Converts config value to string to handle both float (0.01) and string ('0.01')
-target_ratio_str = str(config.SAMPLING_RATIO)
+# ------------------------------------------------------------------------------
+# [Update] Robust Ratio Parsing (Supports 0.1% / 0_1pct)
+# ------------------------------------------------------------------------------
+def get_ratio_folder_name(ratio_input):
+    """
+    Safely converts ratio input to folder name.
+    Handles '0.001' -> '0_1pct' conversion correctly.
+    """
+    raw = str(ratio_input).lower()
+    
+    if raw == 'all':
+        return "1pct" # Default to Main Method (1%)
+        
+    try:
+        val = float(raw)
+        if abs(val - 0.001) < 1e-6: return "0_1pct" # 0.1% Fix
+        elif abs(val - 0.01) < 1e-6: return "1pct"  # 1%
+        elif abs(val - 0.1) < 1e-6: return "10pct"  # 10%
+        elif abs(val - 1.0) < 1e-6: return "100pct" # 100%
+        else:
+            return f"{int(val * 100)}pct"
+    except ValueError:
+        return "1pct" # Safe fallback
 
-if '0.01' in target_ratio_str:
-    TARGET_RATIO = "1pct"
-elif '0.1' in target_ratio_str:
-    TARGET_RATIO = "10pct"
-elif '1.0' in target_ratio_str or '1' == target_ratio_str:
-    TARGET_RATIO = "100pct"
-else:
-    # Fallback default
-    TARGET_RATIO = "10pct"
-    print(f"⚠️ Warning: Config ratio '{config.SAMPLING_RATIO}' not recognized. Defaulting to '10pct'.")
-
-print(f"🎯 Target Ratio Set: {TARGET_RATIO} (from config: {config.SAMPLING_RATIO})")
+TARGET_RATIO = get_ratio_folder_name(config.SAMPLING_RATIO)
+print(f"🎯 Target Ratio: {config.SAMPLING_RATIO} -> Folder: {TARGET_RATIO}")
 
 
 # ==============================================================================
@@ -72,7 +82,7 @@ def extract_features_1536(model, x):
     def hook(module, input, output):
         features.append(output)
         
-    # Hook registration based on architecture
+    # Hook registration based on architecture (handles both Timm & Torchvision)
     if hasattr(model, 'encoder'):
         h1 = model.encoder.layer2.register_forward_hook(hook)
         h2 = model.encoder.layer3.register_forward_hook(hook)
@@ -112,8 +122,9 @@ def get_model_path(base_dir, category):
 def calculate_gap(category, mode):
     """
     Calculates the Anomaly Score Gap between Defect and Normal samples.
+    Returns: Average Gap (Defect - Normal)
     """
-    # [Modified] Suppress initialization logs (e.g., "Initialized. Wavelet: HAAR")
+    # [Log Suppress] Temporarily suppress initialization logs
     with contextlib.redirect_stdout(open(os.devnull, 'w')):
         if mode == 'OFF':
             model = WEDGE_Net(use_semantic=False).to(DEVICE)
@@ -127,20 +138,24 @@ def calculate_gap(category, mode):
         return None
 
     # [Log] Print the verified model path
-    print(f"    [{mode}] Found at: {pt_path}")
+    print(f"    [{mode}] Found at: {os.path.basename(pt_path)}")
 
     # Load Checkpoint
     try:
         checkpoint = torch.load(pt_path, map_location=DEVICE)
         bank = checkpoint['memory_bank'] if isinstance(checkpoint, dict) else checkpoint
+        bank = bank.to(DEVICE)
         model.eval()
     except Exception as e:
         print(f"Error loading {pt_path}: {e}")
         return None
 
     # Load Test Data
-    ds = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
-    loader = DataLoader(ds, batch_size=1, shuffle=False)
+    try:
+        ds = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
+        loader = DataLoader(ds, batch_size=1, shuffle=False)
+    except:
+        return None
 
     normal_scores = []
     defect_scores = []
@@ -160,7 +175,9 @@ def calculate_gap(category, mode):
             features_flat = features.view(c, -1).permute(1, 0)
             
             dists = torch.cdist(features_flat, bank)
+            # Find min distance for each pixel
             s_map = dists.min(dim=1)[0].reshape(h, w).cpu().numpy()
+            # Apply Gaussian Smoothing (same as evaluation)
             s_map = gaussian_filter(s_map, sigma=4)
             score = s_map.max()
 
@@ -172,18 +189,19 @@ def calculate_gap(category, mode):
     if not normal_scores or not defect_scores:
         return 0.0
         
-    # Return Score Gap (Defect - Normal)
+    # Return Score Gap (Defect Mean - Normal Mean)
     return np.mean(defect_scores) - np.mean(normal_scores)
 
 # ==============================================================================
 # 3. Main Execution Flow
 # ==============================================================================
 def main():
-    print(f" [Discussion] Score Gap Analysis")
-    print(f" - Target Ratio  : {TARGET_RATIO}")
-    print(f" - Semantic OFF Dir: {DIR_OFF}")
-    print(f" - Semantic ON  Dir: {DIR_ON}")
-    print("-" * 60)
+    print(f"\n" + "="*60)
+    print(f" [Discussion] Score Gap Analysis (Table 7)")
+    print(f" Target Ratio  : {TARGET_RATIO}")
+    print(f" Semantic OFF  : {DIR_OFF}")
+    print(f" Semantic ON   : {DIR_ON}")
+    print("="*60)
     
     results = []
     tex_gaps_off, tex_gaps_on = [], []
@@ -192,7 +210,6 @@ def main():
     for cat in ALL_CATEGORIES:
         group_type = "Texture" if cat in TEXTURE_CLASSES else "Object"
         
-        # Explicit newline to separate category logs
         print(f" >> [Processing] Category: {cat.upper()} ({group_type})")
         
         # Calculate Gaps
@@ -217,7 +234,7 @@ def main():
         else:
             print(f"    (Skipped: Model checkpoint not found)")
 
-    print("\nAnalysis Complete.")
+    print("\n[Info] Analysis Complete.")
 
     # Calculate Averages
     avg_rows = []
@@ -237,6 +254,7 @@ def main():
 
     # Save to CSV
     if not os.path.exists(DIR_ON): os.makedirs(DIR_ON)
+    
     with open(CSV_PATH, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=['Category', 'Type', 'Gap_OFF', 'Gap_ON', 'Improvement(%)'])
         writer.writeheader()
@@ -244,9 +262,11 @@ def main():
         writer.writerow({}) # Empty row for separation
         writer.writerows(avg_rows)
 
-    print(f"Saved to: {CSV_PATH}")
+    print(f"✅ CSV Saved to: {CSV_PATH}")
+    print("-" * 60)
     for row in avg_rows:
-        print(f" >> {row['Category']}: {row['Gap_OFF']} -> {row['Gap_ON']} ({row['Improvement(%)']}%)")
+        print(f" >> {row['Category']}: Gap {row['Gap_OFF']:.4f} -> {row['Gap_ON']:.4f} (Imp: {row['Improvement(%)']}%)")
+    print("-" * 60)
 
 if __name__ == "__main__":
     main()
