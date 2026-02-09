@@ -12,7 +12,9 @@ Usage:
     Ensure 'config.py' is configured correctly before running.
     python eval_noise_robustness.py
 """
+
 import os
+import sys  # [Fixed] Added missing import for safety check
 import torch
 import torch.nn.functional as F
 import pandas as pd
@@ -68,7 +70,6 @@ def get_ratio_folder_name(ratio_input):
         elif abs(val - 0.1) < 1e-6: return "10pct"  # 10%
         elif abs(val - 1.0) < 1e-6: return "100pct" # 100%
         else:
-            # Fallback for other numbers
             return f"{int(val * 100)}pct"
     except ValueError:
         return "1pct" # Safe fallback
@@ -104,7 +105,6 @@ def find_best_model_path(base_dir, category, target_str=None):
 wedge_base = os.path.join(config.OurModel_DIR, RATIO_FOLDER)
 PATH_WEDGE = find_best_model_path(wedge_base, CATEGORY)
 if PATH_WEDGE is None:
-    # Fallback to hardcoded style just in case
     PATH_WEDGE = os.path.join(wedge_base, f"model_data_{CATEGORY}_{RATIO_FOLDER}.pt")
 
 # 2. PatchCore Path (Smart Search)
@@ -171,6 +171,17 @@ def run_full_evaluation():
     
     os.makedirs(SAVE_DIR, exist_ok=True)
 
+    # --------------------------------------------------------------------------
+    # [Safety Check] Stop if CATEGORY is 'all'
+    # --------------------------------------------------------------------------
+    if str(CATEGORY).lower() == 'all':
+        print("\n" + "!"*60)
+        print(" ⛔ [STOP] CATEGORY = 'all' detected!")
+        print(" This evaluation script requires a SINGLE category.")
+        print(" 👉 Action: Please change 'config.py' to: CATEGORY = 'tile' (or 'bottle', etc.)")
+        print("!"*60 + "\n")
+        sys.exit(0)
+
     # 1. Load Models
     print("Loading models...", end=" ")
     
@@ -227,7 +238,7 @@ def run_full_evaluation():
         for img, label, _, _ in loader:
             img = img.to(DEVICE)
             
-            # --- Noise Injection ---
+            # --- Noise Injection Pipeline ---
             img_raw = unorm(img.clone().squeeze(0)).unsqueeze(0) 
             img_noisy_raw = add_noise(img_raw, nl)
             img_final = norm(img_noisy_raw.squeeze(0)).unsqueeze(0)
