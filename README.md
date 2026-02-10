@@ -75,8 +75,8 @@ To reproduce the specific figures and tables in the paper, you need to specify t
 | Parameter | Description |
 | :--- | :--- |
 | `SemanticON_DIR` | Path to the main proposed model (WEDGE-Net). <br> *Used in: Visualization, Gap Analysis* |
-| `SemanticOFF_DIR` | Path to the baseline model trained with `USE_SEMANTIC=False`. <br> *Used in: Table 7 (Analysis of Anomaly Score Margins)* |
-| `PatchCore_DIR` | Path to pre-trained PatchCore models (.pt files). <br> *Used in: Figure 5 & 6 (Robustness Experiments)* |
+| `SemanticOFF_DIR` | Path to the baseline model trained with `USE_SEMANTIC=False`. <br> *Used in: Table 6 (Analysis of Anomaly Score Margins)* |
+| `PatchCore_DIR` | Path to pre-trained PatchCore models (.pt files). <br> *Used in: Figure 1 & 6 (Robustness Experiments)* |
 
 ---
 
@@ -154,7 +154,7 @@ Evaluates the model's stability against image noise ($\sigma = 0 \sim 40$).
 ```bash
 python eval_noise_robustness.py
 ```
-> **Output:** full_noise_comparison_smoothed_{CATEGORY}_{RATIO}.csv: AUROC scores for each noise level. figure5_noise_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.
+> **Output:** full_noise_comparison_smoothed_{CATEGORY}_{RATIO}.csv: AUROC scores for each noise level. figure_noise_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.
 >
 > **Note:** Comparison with Baseline: If a pre-trained PatchCore checkpoint exists in the patch_core_pt/ directory, the scripts will include it in the comparison. If not, they will gracefully run the evaluation for WEDGE-Net only.
 
@@ -164,7 +164,7 @@ Evaluates the model's stability against domain shifts (Brightness, Contrast, Sat
 ```bash
 python eval_color_robustness.py
 ```
-> **Output:** final_color_comparison_{CATEGORY}_{RATIO}.csv: AUROC scores for each intensity factor (0.0 ~ 3.0). figure6_color_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.
+> **Output:** final_color_comparison_{CATEGORY}_{RATIO}.csv: AUROC scores for each intensity factor (0.0 ~ 3.0). figure_color_robustness_{CATEGORY}_{RATIO}.png: The robustness curve graph.
 > 
 > **Note:** Comparison with Baseline: If a pre-trained PatchCore checkpoint exists in the patch_core_pt/ directory, the scripts will include it in the comparison. If not, they will gracefully run the evaluation for WEDGE-Net only.
 
@@ -200,7 +200,7 @@ python visualize_color_robustness.py
 ---
 ## Discussion: Score Gap Analysis
 
-Script to reproduce **Table 7 (Analysis of Anomaly Score Margin)** from the Discussion section. This analysis verifies how the Semantic Module improves the separation between normal and defect distributions.
+Script to reproduce **Table 6 (Analysis of Anomaly Score Margin)** from the Discussion section. This analysis verifies how the Semantic Module improves the separation between normal and defect distributions.
 
 ```bash
 python eval_gap_score.py
@@ -227,7 +227,7 @@ WEDGE-Net/
 ├── mvtec_ad/                 # [Dataset] MVTec AD Root
 │
 ├── patch_core_pt/            # [Comparison] External SOTA Models
-│   │                         # * To reproduce Fig 5 & 6 comparison:
+│   │                         # * To reproduce Fig 1 & 6 comparison:
 │   │                         #   Train PatchCore (WideResNet-50) using the official repo
 │   │                         #   and place the .pt files here.
 │   └── model_data_tile.pt    # (Optional)
@@ -237,17 +237,17 @@ WEDGE-Net/
 │   ├── 10pct/                # 10% Coreset Baseline
 │   │   ├── model_data_tile_10pct.pt
 │   │   └── results/          # Visualization Figures (Fig 3)
-│   ├── 1pct/                 # Extreme Compression (**proposed baseline**)
+│   ├── 1pct/                 # Extreme Compression<--- [MAIN PROPOSED]
 │   └── 0_1pct/               # 0.1% Stress Test
 │
 └── WEDGE-Net_Sem_OFF/        # [Discussion] Semantic OFF Model
-    │                         # * Used for Table 7 (Score Gap Analysis).
+    │                         # * Used for Table 6 (Score Gap Analysis).
     └── 10pct/                # * Created by changing settings in config.py.
         └── model_data_tile_10pct.pt
 ```
 > [!IMPORTANT]
 > **How to generate the WEDGE-Net_Sem_OFF folder:**
-> To reproduce the Discussion (Table 7), you must train a separate model with the Semantic Module disabled.
+> To reproduce the Discussion (Table 6), you must train a separate model with the Semantic Module disabled.
 > 1. Open `config.py`.
 > 2. Change `USE_SEMANTIC = False`.
 > 3. Change `SAVE_DIR = "WEDGE-Net_Sem_OFF"` (or any name you prefer).
