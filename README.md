@@ -234,15 +234,15 @@ WEDGE-Net/
 │
 ├── WEDGE-Net/                # [Default SAVE_DIR] Proposed Model (Semantic ON)
 │   ├── 100pct/               # Full Memory Bank
-│   ├── 10pct/                # Proposed Baseline (10% Coreset)
+│   ├── 10pct/                # 10% Coreset Baseline
 │   │   ├── model_data_tile_10pct.pt
 │   │   └── results/          # Visualization Figures (Fig 3)
-│   ├── 1pct/                 # Extreme Compression (Main)
+│   ├── 1pct/                 # Extreme Compression (**proposed baseline**)
 │   └── 0_1pct/               # 0.1% Stress Test
 │
 └── WEDGE-Net_Sem_OFF/        # [Discussion] Semantic OFF Model
     │                         # * Used for Table 7 (Score Gap Analysis).
-    └── 10pct/                # * Created by changing settings in config.py (see below).
+    └── 10pct/                # * Created by changing settings in config.py.
         └── model_data_tile_10pct.pt
 ```
 > [!IMPORTANT]
