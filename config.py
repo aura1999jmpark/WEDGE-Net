@@ -52,7 +52,7 @@ SAVE_DIR = "WEDGE-Net"
 #   0.1   : 10% (WEDGE-Net Default)
 #   0.01  : 1% (Extreme Compression)
 #   'all' : Automatically generate and save all three versions.
-SAMPLING_RATIO = '0.1'
+SAMPLING_RATIO = '0.01'
 #SAMPLING_RATIO = 'all'
 
 # Sampling Strategy to use when SAMPLING_RATIO < 1.0.
@@ -77,7 +77,7 @@ SemanticON_DIR = "WEDGE-Net"
 #    - Path to the model trained with USE_SEMANTIC=False
 #    - Used ONLY for Table 7 (Score Gap Analysis)
 #    - [NOTE] Ensure the ratio matches SemanticON_DIR (e.g., if testing 1pct, point this to the 1pct OFF model).
-SemanticOFF_DIR = "WEDGE-Net_Sem_off/10pct"
+SemanticOFF_DIR = "WEDGE-Net_Sem_off"
 
 # 3. External SOTA Comparison (PatchCore)
 #    - Used for Figure 5 & 6 (Noise/Color Robustness)
