@@ -20,13 +20,10 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DIR_OFF = config.SemanticOFF_DIR  # Baseline (Semantic OFF)
 DIR_ON  = config.SemanticON_DIR   # Proposed (Semantic ON)
 
-# Safety Check: Ensure the user set the OFF directory
+# Safety Check
 if not DIR_OFF or DIR_OFF == "":
     print("\n" + "!"*60)
     print(" [Error] 'SemanticOFF_DIR' is empty in config.py!")
-    print(" Please specify the path to the model trained with 'use_semantic=False'.")
-    print(" It is required to reproduce 'Anomaly Score Margin' in the Discussion section")
-    print("!"*60 + "\n")
     sys.exit(1)
 
 # CSV Output Path
@@ -42,102 +39,55 @@ OBJECT_CLASSES = sorted([
 ALL_CATEGORIES = TEXTURE_CLASSES + OBJECT_CLASSES
 
 # ------------------------------------------------------------------------------
-# [Update] Robust Ratio Parsing (Supports 0.1% / 0_1pct)
+# Ratio Parsing
 # ------------------------------------------------------------------------------
 def get_ratio_folder_name(ratio_input):
-    """
-    Safely converts ratio input to folder name.
-    Handles '0.001' -> '0_1pct' conversion correctly.
-    """
     raw = str(ratio_input).lower()
-    
-    if raw == 'all':
-        return "1pct" # Default to Main Method (1%)
-        
+    if raw == 'all': return "1pct"
     try:
         val = float(raw)
-        if abs(val - 0.001) < 1e-6: return "0_1pct" # 0.1% Fix
-        elif abs(val - 0.01) < 1e-6: return "1pct"  # 1%
-        elif abs(val - 0.1) < 1e-6: return "10pct"  # 10%
-        elif abs(val - 1.0) < 1e-6: return "100pct" # 100%
-        else:
-            return f"{int(val * 100)}pct"
-    except ValueError:
-        return "1pct" # Safe fallback
+        if abs(val - 0.001) < 1e-6: return "0_1pct"
+        elif abs(val - 0.01) < 1e-6: return "1pct"
+        elif abs(val - 0.1) < 1e-6: return "10pct"
+        elif abs(val - 1.0) < 1e-6: return "100pct"
+        else: return f"{int(val * 100)}pct"
+    except ValueError: return "1pct"
 
 TARGET_RATIO = get_ratio_folder_name(config.SAMPLING_RATIO)
 print(f"🎯 Target Ratio: {config.SAMPLING_RATIO} -> Folder: {TARGET_RATIO}")
 
-
 # ==============================================================================
 # 2. Utility Functions
 # ==============================================================================
-
-def extract_features_1536(model, x):
-    """
-    Feature Extractor for Semantic OFF Model.
-    Forces extraction of 1536-dim features to match the baseline architecture.
-    """
-    features = []
-    def hook(module, input, output):
-        features.append(output)
-        
-    # Hook registration based on architecture (handles both Timm & Torchvision)
-    if hasattr(model, 'encoder'):
-        h1 = model.encoder.layer2.register_forward_hook(hook)
-        h2 = model.encoder.layer3.register_forward_hook(hook)
-    else:
-        h1 = model.layer2.register_forward_hook(hook)
-        h2 = model.layer3.register_forward_hook(hook)
-        
-    _ = model(x)
-    h1.remove(); h2.remove()
-    
-    # Standard Preprocessing (AvgPool + Interpolate)
-    f1 = F.avg_pool2d(features[0], 3, 1, 1)
-    f2 = F.avg_pool2d(features[1], 3, 1, 1)
-    f2 = F.interpolate(f2, size=f1.shape[2:], mode='bilinear', align_corners=False)
-    
-    return torch.cat([f1, f2], dim=1)
-
 def get_model_path(base_dir, category):
-    """
-    Smart Path Finder for .pt files.
-    Searches for model checkpoints in prioritized order.
-    """
-    # Priority 1: Sub-directory (e.g., base/10pct/model_bottle_10pct.pt)
+    """Smart Path Finder for .pt files."""
+    # Priority 1: Sub-directory
     path1 = os.path.join(base_dir, TARGET_RATIO, f"model_data_{category}_{TARGET_RATIO}.pt")
     if os.path.exists(path1): return path1
-    
-    # Priority 2: Root directory with suffix (e.g., base/model_bottle_10pct.pt)
+    # Priority 2: Root directory with suffix
     path2 = os.path.join(base_dir, f"model_data_{category}_{TARGET_RATIO}.pt")
     if os.path.exists(path2): return path2
-
-    # Priority 3: Legacy naming (e.g., base/model_bottle.pt)
+    # Priority 3: Legacy naming
     path3 = os.path.join(base_dir, f"model_data_{category}.pt")
     if os.path.exists(path3): return path3
-    
     return None
 
 def calculate_gap(category, mode):
-    """
-    Calculates the Anomaly Score Gap between Defect and Normal samples.
-    Returns: Average Gap (Defect - Normal)
-    """
-    # [Log Suppress] Temporarily suppress initialization logs
+    """Calculates Anomaly Score Gap."""
+    # [Log Suppress]
     with contextlib.redirect_stdout(open(os.devnull, 'w')):
         if mode == 'OFF':
+            # Frequency Stream Only (Semantic OFF)
             model = WEDGE_Net(use_semantic=False).to(DEVICE)
             base_dir = DIR_OFF
         else:
+            # Full WEDGE-Net (Semantic ON)
             model = WEDGE_Net(use_semantic=True).to(DEVICE)
             base_dir = DIR_ON
     
     pt_path = get_model_path(base_dir, category)
-    if pt_path is None:
-        return None
+    if pt_path is None: return None
 
-    # [Log] Print the verified model path
     print(f"    [{mode}] Found at: {os.path.basename(pt_path)}")
 
     # Load Checkpoint
@@ -154,8 +104,7 @@ def calculate_gap(category, mode):
     try:
         ds = MVTecDataset(root_dir=config.DATA_PATH, category=category, phase='test')
         loader = DataLoader(ds, batch_size=1, shuffle=False)
-    except:
-        return None
+    except: return None
 
     normal_scores = []
     defect_scores = []
@@ -164,20 +113,18 @@ def calculate_gap(category, mode):
         for img, label, _, _ in loader:
             img = img.to(DEVICE)
             
-            # Feature Extraction
-            if mode == 'OFF':
-                features = extract_features_1536(model, img)
-            else:
-                features, _ = model(img)
+            # [CRITICAL FIX] Always use model() forward pass
+            # This ensures Frequency Stream is applied consistently with training.
+            # If mode=='OFF', model is initialized with use_semantic=False,
+            # so it naturally produces Frequency-Only features.
+            features, _ = model(img)
             
-            # Anomaly Scoring (Mahalanobis-like distance)
+            # Anomaly Scoring
             b, c, h, w = features.shape
             features_flat = features.view(c, -1).permute(1, 0)
             
             dists = torch.cdist(features_flat, bank)
-            # Find min distance for each pixel
             s_map = dists.min(dim=1)[0].reshape(h, w).cpu().numpy()
-            # Apply Gaussian Smoothing (same as evaluation)
             s_map = gaussian_filter(s_map, sigma=4)
             score = s_map.max()
 
@@ -189,7 +136,6 @@ def calculate_gap(category, mode):
     if not normal_scores or not defect_scores:
         return 0.0
         
-    # Return Score Gap (Defect Mean - Normal Mean)
     return np.mean(defect_scores) - np.mean(normal_scores)
 
 # ==============================================================================
@@ -209,15 +155,12 @@ def main():
 
     for cat in ALL_CATEGORIES:
         group_type = "Texture" if cat in TEXTURE_CLASSES else "Object"
-        
         print(f" >> [Processing] Category: {cat.upper()} ({group_type})")
         
-        # Calculate Gaps
         gap_off = calculate_gap(cat, 'OFF')
         gap_on = calculate_gap(cat, 'ON')
         
         if gap_off is not None and gap_on is not None:
-            # Calculate Improvement (%)
             if abs(gap_off) < 1e-9: imp = 0.0
             else: imp = ((gap_on - gap_off) / abs(gap_off)) * 100
             
@@ -259,7 +202,7 @@ def main():
         writer = csv.DictWriter(f, fieldnames=['Category', 'Type', 'Gap_OFF', 'Gap_ON', 'Improvement(%)'])
         writer.writeheader()
         writer.writerows(results)
-        writer.writerow({}) # Empty row for separation
+        writer.writerow({}) 
         writer.writerows(avg_rows)
 
     print(f"✅ CSV Saved to: {CSV_PATH}")
