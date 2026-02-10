@@ -270,7 +270,7 @@ def run_noise_experiment():
         for ax, col in zip(axes[0], cols):
             ax.set_title(col, fontsize=18, fontweight='bold', pad=10)
 
-        save_path = os.path.join(BASE_DIR, f"Figure5_Noise_Robustness_{category}_{ratio_suffix}.png")
+        save_path = os.path.join(BASE_DIR, f"Figure_Noise_Robustness_{category}_{ratio_suffix}.png")
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
         print(f"   ✅ Saved: {save_path}")
