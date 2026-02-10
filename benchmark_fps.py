@@ -1,3 +1,25 @@
+"""
+[Benchmark Script] WEDGE-Net Inference Speed Measurement
+
+This script measures the exact inference FPS (Frames Per Second) of WEDGE-Net models.
+It is designed to validate the "Extreme Efficiency" claims made in the paper.
+
+Methodology:
+1. Environment: Single NVIDIA GPU (e.g., RTX 4090) or CPU.
+2. Input: Single image batch (B=1) to simulate real-time edge processing latency.
+3. Process: 
+   - Feature Extraction (Backbone + Frequency/Semantic Modules)
+   - Anomaly Scoring (Distance calculation against Memory Bank)
+4. Protocol:
+   - Warm-up phase (10 iterations) to stabilize GPU clock.
+   - Synchronization (torch.cuda.synchronize) before and after timing.
+   - Average over 200 iterations for statistical stability.
+
+Note on Comparison:
+- Baseline (PatchCore) speeds reported in the paper were measured using the 
+  official PatchCore implementation under identical hardware conditions.
+"""
+
 import torch
 import time
 import numpy as np
@@ -61,9 +83,11 @@ def measure_fps_exact():
     # 2. Initialize Model (Skeleton)
     # =========================================================
     print("⚙️ Initializing Model Backbone...")
+    # Initialize with default; will be auto-configured later based on feature dim
     model = WEDGE_Net(use_semantic=config.USE_SEMANTIC).to(device)
     model.eval()
     
+    # Dummy Input: Simulates a single image (Batch=1) for real-time latency test
     dummy_input = torch.randn(1, 3, 224, 224).to(device)
 
     # =========================================================
@@ -90,14 +114,11 @@ def measure_fps_exact():
             
             try:
                 checkpoint = torch.load(file_path, map_location=device)
-                if 'memory_bank' not in checkpoint:
-                    print(f"   ⚠️ Skipping: No 'memory_bank' found.")
-                    continue
+                if isinstance(checkpoint, dict) and 'memory_bank' in checkpoint:
+                    full_bank = checkpoint['memory_bank']
+                else:
+                    full_bank = checkpoint # Handle legacy format if any
                     
-                full_bank = checkpoint['memory_bank']
-                if isinstance(full_bank, dict): 
-                     full_bank = full_bank['memory_bank']
-                     
                 current_bank = full_bank.to(device)
                 
                 total_samples = current_bank.shape[0]
@@ -108,6 +129,7 @@ def measure_fps_exact():
                 continue
 
             # --- Auto-Configure Semantic Mode ---
+            # Ensure the model architecture matches the saved feature dimension
             if feature_dim == 2048:
                 model.use_semantic = True
                 mode_str = "Sem_ON (2048)"
@@ -116,33 +138,42 @@ def measure_fps_exact():
                 mode_str = "Sem_OFF (1536)"
             else:
                 mode_str = f"Unknown ({feature_dim})"
+                print(f"   ⚠️ Warning: Unexpected feature dimension {feature_dim}")
             
             # Update Model State
+            # Perform a dummy pass to initialize any lazy-loaded layers
             with torch.no_grad():
                 _ = model(dummy_input)
 
             # --- FPS Measurement ---
             
-            # 1. Warm-up
+            # 1. Warm-up Phase
+            # Runs the model multiple times to stabilize GPU clock frequencies/caches
             with torch.no_grad():
                 for _ in range(10):
                     feat, _ = model(dummy_input)
                     feat_flat = feat.view(feat.shape[1], -1).permute(1, 0)
                     _ = torch.cdist(feat_flat, current_bank)
 
-            # 2. Measurement
+            # 2. Measurement Phase
             iterations = 200
+            
+            # [CRITICAL] Synchronize before starting timer for accurate GPU timing
             if device.type == 'cuda': torch.cuda.synchronize()
             start_time = time.time()
             
             with torch.no_grad():
                 for _ in range(iterations):
+                    # Step 1: Feature Extraction
                     features, _ = model(dummy_input)
                     B, C, H, W = features.shape
+                    
+                    # Step 2: Anomaly Scoring (Nearest Neighbor Search)
                     features_flat = features.view(C, -1).permute(1, 0)
                     dists = torch.cdist(features_flat, current_bank, p=2)
                     _, _ = torch.min(dists, dim=1)
             
+            # [CRITICAL] Synchronize after finishing loops
             if device.type == 'cuda': torch.cuda.synchronize()
             total_time = time.time() - start_time
             
