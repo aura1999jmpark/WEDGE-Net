@@ -10,7 +10,7 @@ Official PyTorch Implementation of WEDGE-Net
 > Abstract: WEDGE-Net is a frequency-aware anomaly detection framework designed for resource-constrained edge devices. By leveraging Discrete Wavelet Transform (DWT) and a Semantic Module, it achieves SOTA-level performance using only 1% of the memory bank, delivering 686 FPS on an RTX 4090.
 
 ## Architecture
-Figure 1: Overview of WEDGE-Net architecture.
+Figure : Overview of WEDGE-Net architecture.
 <img width="2848" height="1504" alt="architecture11" src="https://github.com/user-attachments/assets/c7ea825a-0dc3-4314-bffb-500036c661b4" />
 
 ## ✨ Key Features
