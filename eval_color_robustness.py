@@ -296,7 +296,7 @@ def run_color_evaluation():
     df.to_csv(save_path, index=False)
     print(f"[Info] CSV Saved: {save_path}")
 
-    # 5. Plot Graph (Figure 6)
+    # 5. Plot Graph 
     plt.figure(figsize=(10, 8))
     plt.plot(df['Intensity'], df[f'WEDGE({RATIO_FOLDER})'], marker='o', markersize=12, 
              linewidth=3, label=f'WEDGE-Net ({RATIO_FOLDER})', color='#1f77b4')
@@ -312,5 +312,5 @@ def run_color_evaluation():
     plt.legend(fontsize=12)
     plt.ylim(50, 105) 
     
-    fig_name = f"figure6_color_robustness_{CATEGORY}_{RATIO_FOLDER}.png"
-    plt.savefig(os.path.join(SAVE_DIR, fig_name), dpi=300, bbox_inches='tight
+    fig_name = f"figure_color_robustness_{CATEGORY}_{RATIO_FOLDER}.png"
+    plt.savefig(os.path.join(SAVE_DIR, fig_name), dpi=300, bbox_inches='tight')
