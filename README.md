@@ -36,6 +36,17 @@ cd WEDGE-Net
 pip install -r requirements.txt
 ```
 ---
+### Implementation Details for Reproducibility
+
+WEDGE-Net follows a non-parametric, training-free design. To ensure complete reproducibility, please note the following configurations used for constructing the memory bank:
+
+* **Training Epochs and Optimizer:** Not applicable. The normal feature memory is constructed through a single-pass feature extraction process without iterative gradient-based training.
+* **Backbone Network:** ResNet-50 (initialized with standard pre-trained ImageNet-1K weights) is used and kept frozen during the process.
+* **Feature Extraction Layers:** Features are extracted from Layer 2 and Layer 3 of the backbone.
+* **Memory Bank Construction Settings:**
+    * **Batch Size:** 32
+    * **Random Seed:** 42 (strictly fixed to ensure deterministic coreset sampling)
+    * **Image Pre-processing:** Resized to 256x256 and center-cropped to 224x224 without additional data augmentation.
 
 ## ⚙️ Configuration (`config.py`)
 
