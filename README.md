@@ -1,10 +1,3 @@
-graph LR
-    A[RGB Input] -->|3 channels| B(Grayscale Conversion: 1x1 Conv)
-    B -->|1 channel| C(DWT: Haar, Stride 1)
-    C -->|4 channels| D(Guidance Map Generation)
-    D -->|1 channel| E(Freq Encoder: 3x3 Conv + ReLU)
-    E -->|64 channels| F(Freq Encoder: 3x3 Conv + ReLU)
-    F -->|512 channels| G[Final Frequency Features]
 # WEDGE-Net: Wavelet-Driven Memory-Efficient Anomaly Detection for Industrial Edge Computing
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
